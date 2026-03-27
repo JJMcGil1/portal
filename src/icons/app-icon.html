@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { margin: 0; padding: 0; }
+body { background: transparent; width: 512px; height: 512px; overflow: hidden; }
+</style>
+</head>
+<body>
+<svg width="512" height="512" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background — same as the frame lavender -->
+    <linearGradient id="bg" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0%" stop-color="#F5F3FF"/>
+      <stop offset="100%" stop-color="#DDD6FE"/>
+    </linearGradient>
+
+    <!-- Portal -->
+    <radialGradient id="pL" cx="0.5" cy="0.43" r="0.55">
+      <stop offset="0%" stop-color="#FDFCFF"/>
+      <stop offset="22%" stop-color="#F3E8FF"/>
+      <stop offset="45%" stop-color="#E9D5FF"/>
+      <stop offset="65%" stop-color="#D8B4FE"/>
+      <stop offset="85%" stop-color="#C4B5FD"/>
+      <stop offset="100%" stop-color="#B197FC"/>
+    </radialGradient>
+
+    <!-- Glow -->
+    <radialGradient id="bL" cx="0.5" cy="0.4" r="0.25">
+      <stop offset="0%" stop-color="#fff"/>
+      <stop offset="30%" stop-color="#FAF5FF" stop-opacity="0.9"/>
+      <stop offset="60%" stop-color="#F3E8FF" stop-opacity="0.5"/>
+      <stop offset="100%" stop-color="#E9D5FF" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Inset shadow on the portal opening -->
+    <filter id="inset" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#7E22CE" flood-opacity="0.1"/>
+    </filter>
+
+    <clipPath id="cL">
+      <rect x="48" y="38" width="160" height="180" rx="80"/>
+    </clipPath>
+  </defs>
+
+  <!-- Squircle background — the frame color -->
+  <path d="M56,4 C28,4 4,28 4,56 L4,200 C4,228 28,252 56,252 L200,252 C228,252 252,228 252,200 L252,56 C252,28 228,4 200,4 Z" fill="url(#bg)"/>
+
+  <!-- Portal opening — sitting directly in the background -->
+  <rect x="48" y="38" width="160" height="180" rx="80" fill="url(#pL)" filter="url(#inset)"/>
+
+  <!-- Depth rings -->
+  <g clip-path="url(#cL)">
+    <ellipse cx="128" cy="132" rx="76" ry="84" fill="none" stroke="#C4B5FD" stroke-width="1.5" opacity="0.16"/>
+    <ellipse cx="128" cy="126" rx="60" ry="68" fill="none" stroke="#D8B4FE" stroke-width="1.3" opacity="0.18"/>
+    <ellipse cx="128" cy="120" rx="46" ry="52" fill="none" stroke="#E9D5FF" stroke-width="1.1" opacity="0.22"/>
+    <ellipse cx="128" cy="115" rx="32" ry="38" fill="none" stroke="#F3E8FF" stroke-width="1" opacity="0.28"/>
+    <ellipse cx="128" cy="111" rx="20" ry="24" fill="none" stroke="#FAF5FF" stroke-width="0.8" opacity="0.35"/>
+
+    <!-- Glow -->
+    <rect x="48" y="38" width="160" height="180" rx="80" fill="url(#bL)"/>
+  </g>
+
+  <!-- Core light -->
+  <circle cx="128" cy="106" r="13" fill="#fff" opacity="0.95"/>
+  <circle cx="128" cy="106" r="6" fill="#fff"/>
+</svg>
+</body>
+</html>
