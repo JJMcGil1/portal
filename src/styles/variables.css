@@ -1,0 +1,86 @@
+/* ============================================
+   Portal — Design Tokens
+   ============================================ */
+
+:root {
+  /* ── Portal Brand Palette ── */
+  --portal-100: #FDFCFF;
+  --portal-200: #F3E8FF;
+  --portal-300: #E9D5FF;
+  --portal-400: #D8B4FE;
+  --portal-500: #C4B5FD;
+  --portal-600: #B197FC;
+
+  --frame-light-top: #F5F3FF;
+  --frame-light-bottom: #DDD6FE;
+  --frame-dark-top: #1E1B2E;
+  --frame-dark-bottom: #2D2640;
+
+  --brand-border-dark: #7C3AED;
+  --brand-border-light: #C4B5FD;
+  --brand-shadow-dark: #A855F7;
+  --brand-shadow-light: #7E22CE;
+
+  --text-dark: #0f0f0f;
+  --text-light: #ffffff;
+
+  /* ── Dark Mode (default) — lavender-tinted ── */
+  --bg-primary: #110f1a;
+  --bg-secondary: #191624;
+  --bg-tertiary: #211d2e;
+  --bg-hover: #2a2538;
+  --bg-active: #332d42;
+
+  --border-subtle: rgba(196, 181, 253, 0.06);
+  --border-medium: rgba(196, 181, 253, 0.12);
+
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a6;
+  --text-tertiary: #636369;
+
+  --accent: #C4B5FD;
+  --accent-hover: #D8B4FE;
+  --accent-glow: rgba(196, 181, 253, 0.12);
+  --accent-secondary: #B197FC;
+
+  --danger: #ef4444;
+  --danger-hover: #f87171;
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
+  --font-mono: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-base: 13px;
+  --text-lg: 15px;
+  --text-xl: 20px;
+  --text-2xl: 28px;
+
+  /* Spacing (8px grid) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Layout */
+  --sidebar-width: 240px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.35);
+
+  /* Transitions */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 120ms;
+  --duration-normal: 200ms;
+}

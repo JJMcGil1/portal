@@ -1,0 +1,110 @@
+/* ============================================
+   Light Mode Overrides
+   ============================================ */
+
+body.light-mode {
+  --bg-primary: #ffffff;
+  --bg-secondary: #F5F3FF;
+  --bg-tertiary: #EDE9FE;
+  --bg-hover: #E4DFFB;
+  --bg-active: #DDD6FE;
+
+  --border-subtle: rgba(124, 58, 237, 0.06);
+  --border-medium: rgba(124, 58, 237, 0.12);
+
+  --text-primary: #0f0f0f;
+  --text-secondary: #555559;
+  --text-tertiary: #8e8e96;
+
+  --accent: #7C3AED;
+  --accent-hover: #9333EA;
+  --accent-glow: rgba(124, 58, 237, 0.1);
+  --accent-secondary: #A855F7;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.08);
+
+  background: #ffffff;
+}
+
+body.light-mode .titlebar {
+  background: var(--bg-secondary);
+}
+
+body.light-mode .titlebar-url-bar input {
+  background: var(--bg-primary);
+  border-color: var(--border-medium);
+  color: var(--text-primary);
+}
+
+body.light-mode .titlebar-url-bar input::placeholder {
+  color: var(--text-tertiary);
+}
+
+body.light-mode .titlebar-divider {
+  background: rgba(124, 58, 237, 0.1);
+}
+
+body.light-mode .sidebar {
+  background: var(--bg-secondary);
+}
+
+body.light-mode .content {
+  background: var(--bg-secondary);
+}
+
+body.light-mode .content-frame {
+  background: var(--bg-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05),
+              0 12px 40px rgba(0, 0, 0, 0.03),
+              inset 0 0.5px 0 rgba(255, 255, 255, 0.8);
+  border-color: var(--border-medium);
+}
+
+body.light-mode .logo-text {
+  color: #0f0f0f;
+  opacity: 0.85;
+}
+
+body.light-mode .welcome-title {
+  color: #0f0f0f;
+}
+
+body.light-mode .welcome-subtitle {
+  color: var(--text-tertiary);
+}
+
+body.light-mode ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.15);
+}
+
+body.light-mode ::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+/* Light mode sidebar overlay */
+body.light-mode .app-body.sidebar-overlay .sidebar {
+  box-shadow: 8px 0 32px rgba(0, 0, 0, 0.1),
+              2px 0 8px rgba(0, 0, 0, 0.05);
+}
+
+/* Light mode trigger icon */
+body.light-mode .sidebar-trigger-icon {
+  background: #ffffff;
+  border-color: var(--border-medium);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* Light mode logo/icon swaps */
+body.light-mode .logo-icon-dark,
+body.light-mode .welcome-logo-dark,
+body.light-mode .theme-icon-sun {
+  display: none;
+}
+
+body.light-mode .logo-icon-light,
+body.light-mode .welcome-logo-light,
+body.light-mode .theme-icon-moon {
+  display: block;
+}

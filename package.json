@@ -4,12 +4,20 @@
   "description": "Portal — A beautiful web portal browser",
   "main": "src/main.js",
   "scripts": {
-    "start": "electron .",
-    "dev": "electron . --dev"
+    "build": "node build.js",
+    "start": "node build.js && electron .",
+    "dev": "node build.js && electron . --dev"
   },
   "author": "Portal",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^35.0.0"
+    "electron": "^35.0.0",
+    "esbuild": "^0.27.4"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.8.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "react-icons": "^5.6.0"
   }
 }

@@ -1,0 +1,204 @@
+/* ============================================
+   Shared Components
+   ============================================ */
+
+/* Icon Button */
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  -webkit-app-region: no-drag;
+}
+
+.icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.icon-btn:active {
+  background: var(--bg-active);
+  transform: scale(0.92);
+}
+
+/* Tab Items */
+
+.tab-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 7px 10px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+  position: relative;
+  -webkit-app-region: no-drag;
+  margin-bottom: 1px;
+}
+
+.tab-item:hover {
+  background: var(--bg-hover);
+}
+
+.tab-item.active {
+  background: var(--bg-active);
+}
+
+.tab-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 14px;
+  background: linear-gradient(180deg, var(--accent-secondary), var(--accent));
+  border-radius: 0 2px 2px 0;
+}
+
+.tab-favicon {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.tab-favicon-placeholder {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  background: var(--bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-favicon-placeholder span {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.tab-title {
+  flex: 1;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.tab-item.active .tab-title {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.tab-item:hover .tab-title {
+  color: var(--text-primary);
+}
+
+.tab-close {
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  flex-shrink: 0;
+}
+
+.tab-item:hover .tab-close {
+  opacity: 1;
+}
+
+.tab-close:hover {
+  background: var(--bg-active);
+  color: var(--danger);
+}
+
+/* Saved Items */
+
+.saved-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 7px 10px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+  -webkit-app-region: no-drag;
+  margin-bottom: 1px;
+}
+
+.saved-item:hover {
+  background: var(--bg-hover);
+}
+
+.saved-title {
+  flex: 1;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.saved-item:hover .saved-title {
+  color: var(--text-primary);
+}
+
+.saved-remove {
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  flex-shrink: 0;
+}
+
+.saved-item:hover .saved-remove {
+  opacity: 1;
+}
+
+.saved-remove:hover {
+  background: var(--bg-active);
+  color: var(--danger);
+}
+
+/* Theme Toggle Icons */
+
+.logo-icon-light,
+.welcome-logo-light,
+.theme-icon-moon {
+  display: none;
+}
+
+.logo-icon-dark,
+.welcome-logo-dark,
+.theme-icon-sun {
+  display: block;
+}

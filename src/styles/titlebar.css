@@ -1,0 +1,149 @@
+/* ============================================
+   Titlebar — full-width top bar
+   ============================================ */
+
+.titlebar {
+  height: 38px;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-2);
+  background: var(--bg-secondary);
+  border-bottom: none;
+  position: relative;
+  z-index: 50;
+  flex-shrink: 0;
+}
+
+/* Drag region covers entire titlebar */
+.titlebar-drag-region {
+  -webkit-app-region: drag;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+/* All sections sit above the drag region visually, but remain draggable */
+.titlebar-left,
+.titlebar-center,
+.titlebar-right {
+  position: relative;
+  z-index: 1;
+}
+
+/* Only interactive elements escape the drag region */
+.titlebar button,
+.titlebar input,
+.titlebar a,
+.titlebar select {
+  -webkit-app-region: no-drag;
+}
+
+/* ── Left: traffic light spacer + sidebar toggle ── */
+
+.titlebar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-left: 72px; /* macOS traffic light spacer */
+}
+
+.sidebar-collapse-btn {
+  width: 28px;
+  height: 28px;
+}
+
+.sidebar-collapse-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.titlebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.titlebar-logo .logo-text {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+  user-select: none;
+}
+
+/* ── Center: URL bar ── */
+
+.titlebar-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+
+.titlebar-url-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  max-width: 560px;
+}
+
+.titlebar-url-bar .url-input-icon {
+  position: absolute;
+  left: 10px;
+  color: var(--text-tertiary);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.titlebar-url-bar input {
+  width: 100%;
+  padding: 4px 12px 4px 32px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  outline: none;
+  transition: border-color var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out),
+              background var(--duration-fast) var(--ease-out);
+}
+
+.titlebar-url-bar input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.titlebar-url-bar input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+  background: var(--bg-tertiary);
+}
+
+/* ── Right: nav + actions ── */
+
+.titlebar-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.titlebar-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.titlebar-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border-medium);
+  margin: 0 var(--space-1);
+}

@@ -1,20 +1,7 @@
 const { app, BrowserWindow, ipcMain, session, nativeTheme, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
-
-const DATA_PATH = path.join(app.getPath('userData'), 'portal-data.json');
-
-function loadData() {
-  try {
-    return JSON.parse(fs.readFileSync(DATA_PATH, 'utf8'));
-  } catch {
-    return { sites: [], collections: [] };
-  }
-}
-
-function saveData(data) {
-  fs.writeFileSync(DATA_PATH, JSON.stringify(data, null, 2));
-}
+const database = require('./database.js');
 
 // Force dark mode at the Chromium level so webviews report prefers-color-scheme: dark
 app.commandLine.appendSwitch('force-dark-mode');
@@ -41,7 +28,7 @@ function setupLiveReload(win) {
     const ext = path.extname(filename).toLowerCase();
 
     // Main process file changed — need full restart
-    if (filename === 'main.js' || filename === 'preload.js') {
+    if (filename === 'main.js' || filename === 'preload.js' || filename.endsWith('preload.js')) {
       console.log(`[live-reload] Main process file changed: ${filename} — restart the app`);
       return;
     }
@@ -93,7 +80,7 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 18 },
+    trafficLightPosition: { x: 16, y: 10 },
     backgroundColor: '#0a0a0b',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -168,9 +155,24 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// IPC handlers for data persistence
-ipcMain.handle('load-data', () => loadData());
-ipcMain.handle('save-data', (_, data) => saveData(data));
+app.on('will-quit', () => {
+  database.close();
+});
+
+// IPC handlers — SQLite persistence
+ipcMain.handle('db-get-all-tabs', () => database.getAllTabs());
+ipcMain.handle('db-get-active-tab-id', () => database.getActiveTabId());
+ipcMain.handle('db-create-tab', (_, tab) => database.createTab(tab));
+ipcMain.handle('db-update-tab', (_, id, fields) => database.updateTab(id, fields));
+ipcMain.handle('db-delete-tab', (_, id) => database.deleteTab(id));
+ipcMain.handle('db-get-next-tab-id', () => database.getNextTabId());
+ipcMain.handle('db-get-all-saved', () => database.getAllSaved());
+ipcMain.handle('db-create-saved', (_, site) => database.createSaved(site));
+ipcMain.handle('db-delete-saved', (_, id) => database.deleteSaved(id));
+
+// Legacy — keep for backward compat during transition
+ipcMain.handle('load-data', () => ({ sites: database.getAllSaved() }));
+ipcMain.handle('save-data', () => {});
 
 // Handle DevTools toggle for webview
 ipcMain.on('toggle-devtools', (event, webContentsId) => {
