@@ -171,13 +171,15 @@ function createWindow() {
 
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
-  // Set app icon
-  generateAppIcon().then(icon => {
-    if (process.platform === 'darwin' && app.dock) {
-      app.dock.setIcon(icon);
-    }
-    mainWindow.setIcon(icon);
-  }).catch(err => console.error('[icon]', err));
+  // Set app icon — only needed in dev mode; packaged app uses bundled .icns
+  if (!app.isPackaged) {
+    generateAppIcon().then(icon => {
+      if (process.platform === 'darwin' && app.dock) {
+        app.dock.setIcon(icon);
+      }
+      mainWindow.setIcon(icon);
+    }).catch(err => console.error('[icon]', err));
+  }
 
   setupLiveReload(mainWindow);
 
