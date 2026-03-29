@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="styles/components.css">
   <link rel="stylesheet" href="styles/floating-sidebar.css">
   <link rel="stylesheet" href="styles/light-mode.css">
+  <link rel="stylesheet" href="styles/update-toast.css">
 </head>
 <body>
   <div id="app">
@@ -193,6 +194,15 @@
               <input class="form-input" type="email" id="profile-email" placeholder="you@example.com" spellcheck="false" autocomplete="off" />
             </div>
           </div>
+          <!-- About Section -->
+          <div class="modal-divider"></div>
+          <div class="modal-body about-section">
+            <div class="about-row">
+              <span class="about-label">Portal <span id="about-version">v0.1.0</span></span>
+              <button class="btn btn-secondary about-update-btn" id="about-check-update">Check for updates</button>
+            </div>
+          </div>
+
           <div class="modal-footer">
             <button class="btn btn-secondary" id="account-modal-cancel">Cancel</button>
             <button class="btn btn-primary" id="account-modal-save">Save</button>
@@ -277,6 +287,9 @@
       </button>
     </div>
   </div>
+
+  <!-- Update Toast -->
+  <div id="update-toast"></div>
 
   <script src="dist/renderer.js"></script>
 </body>

@@ -573,6 +573,65 @@
   margin: 4px 6px;
 }
 
+/* ── Modal Divider ── */
+
+.modal-divider {
+  height: 1px;
+  background: var(--border-subtle);
+  margin: 0 var(--space-5);
+}
+
+/* ── About Section ── */
+
+.about-section {
+  padding-top: var(--space-3) !important;
+  padding-bottom: var(--space-3) !important;
+}
+
+.about-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.about-label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.about-label span {
+  color: var(--text-tertiary);
+}
+
+.about-update-btn {
+  font-size: var(--text-xs) !important;
+  height: 26px !important;
+  padding: 0 var(--space-2) !important;
+  gap: var(--space-1);
+  display: inline-flex !important;
+  align-items: center;
+}
+
+.about-update-btn .spinner {
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid var(--text-tertiary);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: about-spin 0.6s linear infinite;
+}
+
+@keyframes about-spin {
+  to { transform: rotate(360deg); }
+}
+
+.about-update-btn .checkmark {
+  color: #22c55e;
+  font-size: 13px;
+  line-height: 1;
+}
+
 /* ── Pinned Tab Items (grid tiles) ── */
 
 .pinned-item {

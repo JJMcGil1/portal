@@ -30,4 +30,19 @@ contextBridge.exposeInMainWorld('portal', {
   // Legacy
   loadData: () => ipcRenderer.invoke('load-data'),
   saveData: (data) => ipcRenderer.invoke('save-data', data),
+
+  // Auto-updater
+  updater: {
+    checkForUpdates: () => ipcRenderer.invoke('updater-check'),
+    downloadUpdate: () => ipcRenderer.invoke('updater-download'),
+    installUpdate: () => ipcRenderer.invoke('updater-install'),
+    dismissUpdate: () => ipcRenderer.invoke('updater-dismiss'),
+    getVersion: () => ipcRenderer.invoke('updater-get-version'),
+    onUpdateAvailable: (cb) => ipcRenderer.on('updater-update-available', (_, data) => cb(data)),
+    onUpToDate: (cb) => ipcRenderer.on('updater-up-to-date', () => cb()),
+    onDownloadProgress: (cb) => ipcRenderer.on('updater-download-progress', (_, data) => cb(data)),
+    onUpdateDownloaded: (cb) => ipcRenderer.on('updater-downloaded', () => cb()),
+    onInstalling: (cb) => ipcRenderer.on('updater-installing', () => cb()),
+    onUpdateError: (cb) => ipcRenderer.on('updater-error', (_, data) => cb(data)),
+  },
 });

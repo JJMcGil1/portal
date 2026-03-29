@@ -5,6 +5,7 @@ const { app, BrowserWindow, ipcMain, session, nativeTheme, nativeImage, shell } 
 const path = require('path');
 const fs = require('fs');
 const database = require('./database.js');
+const autoUpdater = require('./auto-updater.js');
 
 // Force dark mode at the Chromium level
 app.commandLine.appendSwitch('force-dark-mode');
@@ -180,6 +181,9 @@ function createWindow() {
 
   setupLiveReload(mainWindow);
 
+  // Initialize auto-updater
+  autoUpdater.init(mainWindow);
+
   // Inject Chrome spoofing into every webview
   mainWindow.webContents.on('did-attach-webview', (event, webContents) => {
     // Set user agent
@@ -280,6 +284,7 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   session.fromPartition('persist:portal').cookies.flushStore().catch(() => {});
+  autoUpdater.destroy();
   database.close();
 });
 

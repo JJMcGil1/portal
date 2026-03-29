@@ -22,6 +22,8 @@ import { setupFloatingSidebar } from './floating-sidebar.js';
 import { setupAccount } from './account.js';
 import { loadTheme } from './theme.js';
 import { normalizeUrl } from './utils.js';
+import { setupUpdateToast } from './update-toast.js';
+import { setupAbout } from './about.js';
 
 function initStaticIcons() {
   // Titlebar icons
@@ -122,6 +124,8 @@ async function init() {
   setupFloatingSidebar();
   setupTabContextMenu();
   await setupAccount();
+  setupUpdateToast();
+  await setupAbout();
 }
 
 loadTheme();
