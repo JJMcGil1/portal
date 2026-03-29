@@ -4,7 +4,6 @@ export const urlInput = document.getElementById('url-input');
 export const tabsList = document.getElementById('tabs-list');
 export const savedList = document.getElementById('saved-list');
 export const welcome = document.getElementById('welcome');
-export const webviewContainer = document.getElementById('webview-container');
 export const newTabBtn = document.getElementById('new-tab-btn');
 export const saveSiteBtn = document.getElementById('save-site-btn');
 export const devtoolsBtn = document.getElementById('devtools-btn');

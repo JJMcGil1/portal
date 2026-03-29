@@ -15,7 +15,7 @@ import { MdOutlineTab } from 'react-icons/md';
 import { renderIcon } from './icon.js';
 import { state, setTabIdCounter } from './state.js';
 import { renderSaved } from './saved.js';
-import { restoreTab, activateTab, renderTabs, createTab, createNewTab, navigateTab, setupTabContextMenu } from './tabs.js';
+import { restoreTab, activateTab, renderTabs, createTab, createNewTab, navigateTab, setupTabContextMenu, setupBoundsTracking, setupTabViewEvents } from './tabs.js';
 import { setupEvents } from './events.js';
 import { setupSidebar } from './sidebar.js';
 import { setupFloatingSidebar } from './floating-sidebar.js';
@@ -119,6 +119,8 @@ async function init() {
   }
 
   renderTabs();
+  setupBoundsTracking();
+  setupTabViewEvents();
   setupEvents();
   setupSidebar();
   setupFloatingSidebar();

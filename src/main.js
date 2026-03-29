@@ -1,7 +1,7 @@
 // Suppress Electron security warnings before anything else
 process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
 
-const { app, BrowserWindow, ipcMain, session, nativeTheme, nativeImage, shell } = require('electron');
+const { app, BrowserWindow, WebContentsView, ipcMain, session, nativeTheme, nativeImage, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const database = require('./database.js');
@@ -10,6 +10,20 @@ const autoUpdater = require('./auto-updater.js');
 // Force dark mode at the Chromium level
 app.commandLine.appendSwitch('force-dark-mode');
 
+// Disable Chromium features that leak Electron identity
+app.commandLine.appendSwitch('disable-features', 'AutofillServerCommunication,Autofill');
+// Allow third-party cookies (Google auth flow uses cross-origin cookies extensively)
+app.commandLine.appendSwitch('disable-site-isolation-trials');
+
+
+// --- Structured logging ---
+const log = {
+  tab: (tabId, msg, ...args) => console.log(`[tab:${tabId}] ${msg}`, ...args),
+  session: (msg, ...args) => console.log(`[session] ${msg}`, ...args),
+  app: (msg, ...args) => console.log(`[app] ${msg}`, ...args),
+  warn: (ctx, msg, ...args) => console.warn(`[${ctx}] ⚠ ${msg}`, ...args),
+};
+
 // Strip "Electron" from the default user agent globally
 const defaultUA = app.userAgentFallback;
 app.userAgentFallback = defaultUA
@@ -17,6 +31,11 @@ app.userAgentFallback = defaultUA
   .replace(/\s*portal\/[\d.]+/, '');
 
 let mainWindow;
+
+// --- Tab View Management ---
+const tabViews = new Map(); // tabId -> WebContentsView
+let activeTabViewId = null;
+let contentBounds = { x: 0, y: 0, width: 800, height: 600 };
 
 // --- Live Reload ---
 const isDev = !app.isPackaged;
@@ -37,12 +56,12 @@ function setupLiveReload(win) {
     const ext = path.extname(filename).toLowerCase();
 
     if (filename === 'main.js' || filename === 'preload.js' || filename.endsWith('preload.js')) {
-      console.log(`[live-reload] Main process file changed: ${filename} — restart the app`);
+      log.app(`Main process file changed: ${filename} — restart the app`);
       return;
     }
 
     if (['.html', '.css', '.js'].includes(ext)) {
-      console.log(`[live-reload] ${filename} changed — reloading renderer`);
+      log.app(`${filename} changed — reloading renderer`);
       if (ext === '.css') {
         win.webContents.executeJavaScript(`
           document.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
@@ -56,7 +75,7 @@ function setupLiveReload(win) {
     }
   });
 
-  console.log('[live-reload] Watching src/ for changes...');
+  log.app('Live reload watching src/ for changes');
 }
 
 async function generateAppIcon() {
@@ -76,81 +95,207 @@ async function generateAppIcon() {
   return image;
 }
 
-// --- Chrome spoofing ---
+// --- Chrome version info (used for UA spoofing and header rewriting) ---
 const chromeVersion = process.versions.chrome;
 const chromeMajor = chromeVersion.split('.')[0];
 
-const CHROME_SPOOF_SCRIPT = `
-  if (navigator.userAgentData) {
-    const brands = [
-      { brand: "Chromium", version: "${chromeMajor}" },
-      { brand: "Google Chrome", version: "${chromeMajor}" },
-      { brand: "Not-A.Brand", version: "99" }
-    ];
-    Object.defineProperty(navigator, 'userAgentData', {
-      value: Object.create(NavigatorUAData.prototype, {
-        brands: { get: () => brands, enumerable: true },
-        mobile: { get: () => false, enumerable: true },
-        platform: { get: () => "macOS", enumerable: true },
-        toJSON: { value: function() { return { brands, mobile: false, platform: "macOS" }; } },
-        getHighEntropyValues: {
-          value: function(hints) {
-            return Promise.resolve({
-              brands,
-              mobile: false,
-              platform: "macOS",
-              platformVersion: "15.0.0",
-              architecture: "arm",
-              model: "",
-              uaFullVersion: "${chromeVersion}",
-              fullVersionList: [
-                { brand: "Chromium", version: "${chromeVersion}" },
-                { brand: "Google Chrome", version: "${chromeVersion}" },
-                { brand: "Not-A.Brand", version: "99.0.0.0" }
-              ]
-            });
-          }
-        }
-      }),
-      configurable: false
-    });
-  }
-  if (!window.chrome) window.chrome = {};
-  if (!window.chrome.runtime) {
-    window.chrome.runtime = {
-      connect: function() { return { onMessage: { addListener: function(){} }, postMessage: function(){} }; },
-      sendMessage: function() {},
-      onMessage: { addListener: function(){}, removeListener: function(){} },
-      onConnect: { addListener: function(){}, removeListener: function(){} },
-      id: undefined
-    };
-  }
-  if (!window.chrome.loadTimes) {
-    window.chrome.loadTimes = function() {
-      return { commitLoadTime: Date.now()/1000, connectionInfo: "h2", finishDocumentLoadTime: Date.now()/1000,
-        finishLoadTime: Date.now()/1000, firstPaintAfterLoadTime: 0, firstPaintTime: Date.now()/1000,
-        navigationType: "Other", npnNegotiatedProtocol: "h2", requestTime: Date.now()/1000,
-        startLoadTime: Date.now()/1000, wasAlternateProtocolAvailable: false, wasFetchedViaSpdy: true, wasNpnNegotiated: true };
-    };
-  }
-  if (!window.chrome.csi) {
-    window.chrome.csi = function() { return { startE: Date.now(), onloadT: Date.now(), pageT: Date.now(), tran: 15 }; };
-  }
-  Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-  Object.defineProperty(navigator, 'plugins', {
-    get: () => [
-      { name: "PDF Viewer", filename: "internal-pdf-viewer", description: "Portable Document Format" },
-      { name: "Chrome PDF Viewer", filename: "internal-pdf-viewer", description: "" },
-      { name: "Chromium PDF Viewer", filename: "internal-pdf-viewer", description: "" },
-      { name: "Microsoft Edge PDF Viewer", filename: "internal-pdf-viewer", description: "" },
-      { name: "WebKit built-in PDF", filename: "internal-pdf-viewer", description: "" }
-    ]
-  });
-  Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
-  if (typeof process !== 'undefined' && process.versions && process.versions.electron) {
-    try { delete window.process; } catch(e) {}
+// --- Dark mode injection for tab views ---
+const darkModeCSS = `
+  @media (prefers-color-scheme: light) {
+    :root { color-scheme: dark !important; }
   }
 `;
+
+function injectDarkMode(webContents) {
+  webContents.insertCSS(darkModeCSS).catch(() => {});
+  webContents.executeJavaScript(`
+    if (!document.querySelector('meta[name="color-scheme"][data-portal]')) {
+      const meta = document.createElement('meta');
+      meta.name = 'color-scheme';
+      meta.content = 'dark';
+      meta.dataset.portal = '1';
+      document.head.appendChild(meta);
+    }
+  `).catch(() => {});
+}
+
+
+// --- URL sanitization ---
+// Google auth rejection URLs get persisted in the DB. On restore, redirect to the
+// original destination (the `continue` param) instead of loading the rejection page.
+function sanitizeUrl(url) {
+  if (!url) return url;
+  try {
+    const u = new URL(url);
+    if (u.hostname === 'accounts.google.com' && u.pathname.includes('/signin/rejected')) {
+      const continueUrl = u.searchParams.get('continue') || u.searchParams.get('followup');
+      if (continueUrl) {
+        log.app(`Sanitized rejected Google URL → ${continueUrl}`);
+        return continueUrl;
+      }
+    }
+  } catch (e) {}
+  return url;
+}
+
+// --- Tab View lifecycle ---
+
+function createTabView(tabId, url) {
+  if (!mainWindow) return;
+
+  url = sanitizeUrl(url);
+  log.tab(tabId, `Creating WebContentsView${url ? ` → ${url}` : ' (blank)'}`);
+
+  // Destroy existing view for this tabId (e.g. after renderer reload)
+  if (tabViews.has(tabId)) {
+    log.tab(tabId, 'Destroying previous view (renderer reload cleanup)');
+    const oldView = tabViews.get(tabId);
+    mainWindow.contentView.removeChildView(oldView);
+    tabViews.delete(tabId);
+  }
+
+  const view = new WebContentsView({
+    webPreferences: {
+      preload: path.join(__dirname, 'webview-preload.js'),
+      partition: 'persist:portal',
+      contextIsolation: false,   // Must be false so preload can set window.chrome, navigator.userAgentData etc.
+      nodeIntegration: false,
+      sandbox: false,
+    }
+  });
+
+  const wc = view.webContents;
+  const chromeUA = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`;
+
+  // Register view in map AND add to window IMMEDIATELY so showTabView can
+  // find it and setBounds works (view starts off-screen until activated).
+  // This MUST happen synchronously so showTabView (called right after) can find it.
+  tabViews.set(tabId, view);
+  view.setBounds({ x: -9999, y: -9999, width: 1, height: 1 });
+  try { view.setBorderRadius(11); } catch (e) {}
+  mainWindow.contentView.addChildView(view);
+
+  // Set UA at the webContents level (synchronous, takes effect before any navigation).
+  // navigator.userAgentData is disabled via Chromium flag (--disable-features=UserAgentClientHint).
+  // Google falls back to parsing the User-Agent string, which this controls.
+  wc.setUserAgent(chromeUA);
+
+  // Dark mode injection
+  wc.on('did-finish-load', () => injectDarkMode(wc));
+  wc.on('did-navigate', (event, navUrl) => {
+    injectDarkMode(wc);
+
+    // Google sign-in detection: if Google rejects sign-in, open in system browser.
+    // Google blocks ALL Electron-based browsers (even Arc-style WebContentsView).
+    // The only reliable approach is system browser for auth.
+    if (navUrl && navUrl.includes('accounts.google.com') && navUrl.includes('/signin/rejected')) {
+      const u = new URL(navUrl);
+      const continueUrl = u.searchParams.get('continue') || u.searchParams.get('followup') || 'https://accounts.google.com';
+      log.app(`Google blocked sign-in — opening in system browser: ${continueUrl}`);
+      shell.openExternal(continueUrl);
+      // Navigate the tab to the destination (user will be signed out but can browse)
+      wc.loadURL(continueUrl);
+    }
+  });
+
+  // Forward events to the renderer UI
+  wc.on('did-start-loading', () => {
+    mainWindow?.webContents.send('tab-did-start-loading', tabId);
+  });
+
+  wc.on('did-stop-loading', () => {
+    mainWindow?.webContents.send('tab-did-stop-loading', tabId);
+  });
+
+  wc.on('page-title-updated', (event, title) => {
+    mainWindow?.webContents.send('tab-page-title-updated', tabId, title);
+  });
+
+  wc.on('page-favicon-updated', (event, favicons) => {
+    mainWindow?.webContents.send('tab-page-favicon-updated', tabId, favicons);
+  });
+
+  wc.on('did-navigate', (event, navUrl) => {
+    mainWindow?.webContents.send('tab-did-navigate', tabId, navUrl);
+  });
+
+  wc.on('did-navigate-in-page', (event, navUrl, isMainFrame) => {
+    mainWindow?.webContents.send('tab-did-navigate-in-page', tabId, navUrl, isMainFrame);
+  });
+
+  // Popup / target=_blank -> open as new tab
+  wc.setWindowOpenHandler(({ url: openUrl }) => {
+    mainWindow?.webContents.send('tab-new-window', openUrl);
+    return { action: 'deny' };
+  });
+
+  // Navigate
+  if (url) {
+    log.tab(tabId, `Navigating to ${url}`);
+    wc.loadURL(url);
+  }
+
+  log.tab(tabId, `Ready (pid: ${wc.getOSProcessId()}, partition: persist:portal)`);
+}
+
+function showTabView(tabId) {
+  // Hide the previously active view
+  if (activeTabViewId !== null && activeTabViewId !== tabId) {
+    const oldView = tabViews.get(activeTabViewId);
+    if (oldView) {
+      oldView.setBounds({ x: -9999, y: -9999, width: 1, height: 1 });
+    }
+  }
+
+  // Show the requested view
+  const view = tabViews.get(tabId);
+  if (view) {
+    log.tab(tabId, `Showing at bounds: ${JSON.stringify(contentBounds)}`);
+    view.setBounds(contentBounds);
+    try { view.setBorderRadius(11); } catch (e) {}
+    activeTabViewId = tabId;
+  } else {
+    log.warn('tab', `showTabView(${tabId}) — view not found in map`);
+  }
+}
+
+function hideAllTabViews() {
+  for (const [, view] of tabViews) {
+    view.setBounds({ x: -9999, y: -9999, width: 1, height: 1 });
+  }
+  activeTabViewId = null;
+}
+
+function destroyTabView(tabId) {
+  const view = tabViews.get(tabId);
+  if (view) {
+    mainWindow.contentView.removeChildView(view);
+    tabViews.delete(tabId);
+    if (activeTabViewId === tabId) {
+      activeTabViewId = null;
+    }
+    log.tab(tabId, 'Destroyed');
+  }
+}
+
+function updateContentBounds(bounds) {
+  const changed = contentBounds.x !== bounds.x || contentBounds.y !== bounds.y ||
+                  contentBounds.width !== bounds.width || contentBounds.height !== bounds.height;
+  contentBounds = bounds;
+  if (changed) {
+    log.app(`Content bounds updated: ${JSON.stringify(bounds)}`);
+  }
+  // Reposition the active tab view
+  if (activeTabViewId !== null) {
+    const view = tabViews.get(activeTabViewId);
+    if (view) {
+      view.setBounds(contentBounds);
+      try { view.setBorderRadius(11); } catch (e) {}
+    }
+  }
+}
+
+// --- Window creation ---
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -165,7 +310,6 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      webviewTag: true,
     },
   });
 
@@ -185,74 +329,69 @@ function createWindow() {
 
   // Initialize auto-updater
   autoUpdater.init(mainWindow);
-
-  // Inject Chrome spoofing into every webview
-  mainWindow.webContents.on('did-attach-webview', (event, webContents) => {
-    // Set user agent
-    webContents.setUserAgent(
-      `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`
-    );
-
-    // Inject spoofing before page scripts run
-    webContents.on('did-start-navigation', (e, navUrl, isInPlace, isMainFrame) => {
-      if (isMainFrame) {
-        webContents.executeJavaScript(CHROME_SPOOF_SCRIPT).catch(() => {});
-      }
-    });
-
-    // Dark mode injection
-    const darkModeCSS = `
-      @media (prefers-color-scheme: light) {
-        :root { color-scheme: dark !important; }
-      }
-    `;
-    function injectDarkMode() {
-      webContents.insertCSS(darkModeCSS).catch(() => {});
-      webContents.executeJavaScript(`
-        if (!document.querySelector('meta[name="color-scheme"][data-portal]')) {
-          const meta = document.createElement('meta');
-          meta.name = 'color-scheme';
-          meta.content = 'dark';
-          meta.dataset.portal = '1';
-          document.head.appendChild(meta);
-        }
-      `).catch(() => {});
-    }
-    webContents.on('did-finish-load', injectDarkMode);
-    webContents.on('did-navigate', injectDarkMode);
-  });
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  log.app('Portal starting');
+  log.app(`Architecture: WebContentsView (embedded Chromium ${chromeVersion})`);
+  log.app(`Platform: ${process.platform} ${process.arch}`);
+  log.app(`Electron: ${process.versions.electron}`);
+
   nativeTheme.themeSource = 'dark';
 
-  // Configure the persist:portal partition
-  const webviewSession = session.fromPartition('persist:portal');
+  // Configure the persist:portal partition (shared by all tab views)
+  const portalSession = session.fromPartition('persist:portal');
+
+  // One-time session clear to purge Google's flagged cookies from previous
+  // spoofing attempts. Uses a flag file so it only happens once.
+  const flagFile = path.join(app.getPath('userData'), '.session-cleared-v3');
+  if (!fs.existsSync(flagFile)) {
+    await portalSession.clearStorageData();
+    fs.writeFileSync(flagFile, new Date().toISOString());
+    log.session('One-time session clear (purging stale Google flags)');
+  }
 
   const cleanUA = `"Chromium";v="${chromeMajor}", "Google Chrome";v="${chromeMajor}", "Not-A.Brand";v="99"`;
   const cleanUAFull = `"Chromium";v="${chromeVersion}", "Google Chrome";v="${chromeVersion}", "Not-A.Brand";v="99.0.0.0"`;
 
-  // Rewrite headers to remove Electron fingerprint
-  webviewSession.webRequest.onBeforeSendHeaders((details, callback) => {
-    const headers = { ...details.requestHeaders };
-    if (headers['Sec-CH-UA'] || headers['sec-ch-ua']) {
-      headers['Sec-CH-UA'] = cleanUA;
-      delete headers['sec-ch-ua'];
+  // Rewrite headers to remove ALL Electron fingerprints.
+  // Rewrite Sec-CH-UA headers and strip Electron from User-Agent on all requests.
+  portalSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    const headers = {};
+
+    // Rebuild headers, stripping any sec-ch-ua variants (case-insensitive)
+    // and Electron traces from User-Agent
+    for (const [key, value] of Object.entries(details.requestHeaders)) {
+      const lower = key.toLowerCase();
+
+      // Skip all sec-ch-ua headers — we'll set correct ones below
+      if (lower === 'sec-ch-ua' || lower === 'sec-ch-ua-full-version-list' ||
+          lower === 'sec-ch-ua-mobile' || lower === 'sec-ch-ua-platform') {
+        continue;
+      }
+
+      // Clean User-Agent
+      if (lower === 'user-agent') {
+        headers[key] = value
+          .replace(/\s*Electron\/[\d.]+/, '')
+          .replace(/\s*portal\/[\d.]+/, '');
+        continue;
+      }
+
+      headers[key] = value;
     }
-    if (headers['Sec-CH-UA-Full-Version-List'] || headers['sec-ch-ua-full-version-list']) {
-      headers['Sec-CH-UA-Full-Version-List'] = cleanUAFull;
-      delete headers['sec-ch-ua-full-version-list'];
-    }
-    if (headers['User-Agent']) {
-      headers['User-Agent'] = headers['User-Agent']
-        .replace(/\s*Electron\/[\d.]+/, '')
-        .replace(/\s*portal\/[\d.]+/, '');
-    }
+
+    // Force-set all client hint headers with correct values
+    headers['Sec-CH-UA'] = cleanUA;
+    headers['Sec-CH-UA-Full-Version-List'] = cleanUAFull;
+    headers['Sec-CH-UA-Mobile'] = '?0';
+    headers['Sec-CH-UA-Platform'] = '"macOS"';
+
     callback({ requestHeaders: headers });
   });
 
   // Strip restrictive CSP headers
-  webviewSession.webRequest.onHeadersReceived((details, callback) => {
+  portalSession.webRequest.onHeadersReceived((details, callback) => {
     const headers = { ...details.responseHeaders };
     delete headers['content-security-policy'];
     delete headers['Content-Security-Policy'];
@@ -262,18 +401,21 @@ app.whenReady().then(() => {
   });
 
   // Allow all permissions
-  webviewSession.setPermissionRequestHandler((webContents, permission, callback) => {
+  portalSession.setPermissionRequestHandler((webContents, permission, callback) => {
     callback(true);
   });
 
-  webviewSession.cookies.flushStore().catch(() => {});
+  portalSession.cookies.flushStore().catch(() => {});
 
-  // Set standard user agent
-  webviewSession.setUserAgent(
-    `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`
-  );
+  // Set standard user agent on the session
+  const sessionUA = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`;
+  portalSession.setUserAgent(sessionUA);
+
+  log.session('Session configured: UA spoofing, header rewriting, CSP stripping, permission grants');
+  log.session(`UA: Chrome/${chromeVersion} on macOS`);
 
   createWindow();
+  log.app('Window created — ready');
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -290,9 +432,72 @@ app.on('will-quit', () => {
   database.close();
 });
 
-// --- IPC ---
+// --- IPC: Tab View Management ---
 
-// Open URL in system browser (for Google auth fallback)
+ipcMain.handle('tab-view-create', (_, tabId, url) => {
+  createTabView(tabId, url);
+});
+
+ipcMain.handle('tab-view-destroy', (_, tabId) => {
+  destroyTabView(tabId);
+});
+
+ipcMain.handle('tab-view-show', (_, tabId) => {
+  showTabView(tabId);
+});
+
+ipcMain.handle('tab-view-hide-all', () => {
+  hideAllTabViews();
+});
+
+ipcMain.handle('tab-view-navigate', (_, tabId, url) => {
+  url = sanitizeUrl(url);
+  const view = tabViews.get(tabId);
+  if (view) {
+    log.tab(tabId, `Navigating → ${url}`);
+    view.webContents.loadURL(url);
+  }
+});
+
+ipcMain.handle('tab-view-go-back', (_, tabId) => {
+  const view = tabViews.get(tabId);
+  if (view && view.webContents.canGoBack()) {
+    view.webContents.goBack();
+  }
+});
+
+ipcMain.handle('tab-view-go-forward', (_, tabId) => {
+  const view = tabViews.get(tabId);
+  if (view && view.webContents.canGoForward()) {
+    view.webContents.goForward();
+  }
+});
+
+ipcMain.handle('tab-view-reload', (_, tabId) => {
+  const view = tabViews.get(tabId);
+  if (view) {
+    view.webContents.reload();
+  }
+});
+
+ipcMain.handle('tab-view-devtools', (_, tabId) => {
+  const view = tabViews.get(tabId);
+  if (view) {
+    if (view.webContents.isDevToolsOpened()) {
+      view.webContents.closeDevTools();
+    } else {
+      view.webContents.openDevTools({ mode: 'right' });
+    }
+  }
+});
+
+ipcMain.handle('tab-view-set-bounds', (_, bounds) => {
+  updateContentBounds(bounds);
+});
+
+// --- IPC: General ---
+
+// Open URL in system browser
 ipcMain.handle('open-external', (_, url) => {
   shell.openExternal(url);
 });
@@ -314,7 +519,7 @@ ipcMain.handle('db-reorder-pinned-tabs', (_, orderedIds) => database.reorderPinn
 ipcMain.handle('load-data', () => ({ sites: database.getAllSaved() }));
 ipcMain.handle('save-data', () => {});
 
-// Handle DevTools toggle for webview
+// Handle DevTools toggle for webview (legacy, kept for compatibility)
 ipcMain.on('toggle-devtools', (event, webContentsId) => {
   const allWebContents = require('electron').webContents.getAllWebContents();
   const target = allWebContents.find((wc) => wc.id === webContentsId);

@@ -181,21 +181,6 @@
   color: var(--text-secondary);
 }
 
-/* Webview container */
-.webview-container {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-}
-
-.webview-container webview,
-.webview-container .tab-webview {
-  width: 100%;
-  height: 100%;
-  border: none;
-  border-radius: var(--radius-lg);
-}
-
 /* Loading Bar */
 
 .loading-bar {

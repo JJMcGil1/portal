@@ -4,8 +4,29 @@ contextBridge.exposeInMainWorld('portal', {
   // Open URL in system browser (for Google auth fallback)
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
 
-  // DevTools
+  // DevTools (legacy)
   toggleDevTools: (webContentsId) => ipcRenderer.send('toggle-devtools', webContentsId),
+
+  // --- Tab View Management (WebContentsView in main process) ---
+  createTabView: (tabId, url) => ipcRenderer.invoke('tab-view-create', tabId, url),
+  destroyTabView: (tabId) => ipcRenderer.invoke('tab-view-destroy', tabId),
+  showTabView: (tabId) => ipcRenderer.invoke('tab-view-show', tabId),
+  hideAllTabViews: () => ipcRenderer.invoke('tab-view-hide-all'),
+  navigateTabView: (tabId, url) => ipcRenderer.invoke('tab-view-navigate', tabId, url),
+  tabGoBack: (tabId) => ipcRenderer.invoke('tab-view-go-back', tabId),
+  tabGoForward: (tabId) => ipcRenderer.invoke('tab-view-go-forward', tabId),
+  tabReload: (tabId) => ipcRenderer.invoke('tab-view-reload', tabId),
+  tabToggleDevTools: (tabId) => ipcRenderer.invoke('tab-view-devtools', tabId),
+  setTabViewBounds: (bounds) => ipcRenderer.invoke('tab-view-set-bounds', bounds),
+
+  // Tab view events (main -> renderer)
+  onTabDidStartLoading: (cb) => ipcRenderer.on('tab-did-start-loading', (_, tabId) => cb(tabId)),
+  onTabDidStopLoading: (cb) => ipcRenderer.on('tab-did-stop-loading', (_, tabId) => cb(tabId)),
+  onTabPageTitleUpdated: (cb) => ipcRenderer.on('tab-page-title-updated', (_, tabId, title) => cb(tabId, title)),
+  onTabPageFaviconUpdated: (cb) => ipcRenderer.on('tab-page-favicon-updated', (_, tabId, favicons) => cb(tabId, favicons)),
+  onTabDidNavigate: (cb) => ipcRenderer.on('tab-did-navigate', (_, tabId, url) => cb(tabId, url)),
+  onTabDidNavigateInPage: (cb) => ipcRenderer.on('tab-did-navigate-in-page', (_, tabId, url, isMainFrame) => cb(tabId, url, isMainFrame)),
+  onTabNewWindow: (cb) => ipcRenderer.on('tab-new-window', (_, url) => cb(url)),
 
   // Tab persistence
   getAllTabs: () => ipcRenderer.invoke('db-get-all-tabs'),

@@ -1,6 +1,7 @@
 // Account tile + settings modal
 import { PiX } from 'react-icons/pi';
 import { renderIcon } from './icon.js';
+import { state } from './state.js';
 
 let profile = { first_name: '', last_name: '', email: '', photo: null };
 
@@ -75,12 +76,21 @@ function openModal() {
   tempPhoto = profile.photo || null;
   updateModalPreview(profile.first_name, profile.last_name, tempPhoto);
   overlay.classList.add('open');
+  // Hide the active tab view so the modal renders on top
+  window.portal.hideAllTabViews();
   requestAnimationFrame(() => firstNameInput.focus());
 }
 
 function closeModal() {
   overlay.classList.remove('open');
   tempPhoto = null;
+  // Restore the active tab view
+  if (state.activeTabId) {
+    const tab = state.tabs.find(t => t.id === state.activeTabId);
+    if (tab && tab.url) {
+      window.portal.showTabView(state.activeTabId);
+    }
+  }
 }
 
 async function saveProfile() {

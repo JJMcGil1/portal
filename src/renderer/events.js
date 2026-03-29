@@ -3,7 +3,7 @@
 import { state } from './state.js';
 import { normalizeUrl } from './utils.js';
 import { urlInput, newTabBtn, saveSiteBtn, devtoolsBtn, backBtn, forwardBtn, reloadBtn, themeToggleBtn } from './dom.js';
-import { createTab, createNewTab, navigateTab, closeTab, getActiveWebview } from './tabs.js';
+import { createTab, createNewTab, navigateTab, closeTab } from './tabs.js';
 import { saveCurrent } from './saved.js';
 import { toggleTheme } from './theme.js';
 
@@ -53,34 +53,28 @@ export function setupEvents() {
   saveSiteBtn.addEventListener('click', saveCurrent);
   themeToggleBtn.addEventListener('click', toggleTheme);
 
-  // Navigation — direct webview method calls
+  // Navigation — via IPC to main process tab views
   devtoolsBtn.addEventListener('click', () => {
-    const wv = getActiveWebview();
-    if (wv) {
-      // Use IPC to toggle devtools since webview.openDevTools() isn't directly available
-      const wcId = wv.getWebContentsId();
-      window.portal.toggleDevTools(wcId);
+    if (state.activeTabId) {
+      window.portal.tabToggleDevTools(state.activeTabId);
     }
   });
 
   backBtn.addEventListener('click', () => {
-    const wv = getActiveWebview();
-    if (wv && wv.canGoBack()) {
-      wv.goBack();
+    if (state.activeTabId) {
+      window.portal.tabGoBack(state.activeTabId);
     }
   });
 
   forwardBtn.addEventListener('click', () => {
-    const wv = getActiveWebview();
-    if (wv && wv.canGoForward()) {
-      wv.goForward();
+    if (state.activeTabId) {
+      window.portal.tabGoForward(state.activeTabId);
     }
   });
 
   reloadBtn.addEventListener('click', () => {
-    const wv = getActiveWebview();
-    if (wv) {
-      wv.reload();
+    if (state.activeTabId) {
+      window.portal.tabReload(state.activeTabId);
     }
   });
 }

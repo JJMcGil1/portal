@@ -1,46 +1,50 @@
 // Tab management — CRUD, rendering, loading bar
+// Tab views (WebContentsView) are managed by the main process.
+// The renderer communicates tab operations via IPC.
 
 import { PiX } from 'react-icons/pi';
 import { MdOutlineTab } from 'react-icons/md';
 import { state, nextTabId } from './state.js';
 import { getDomain, getInitial, escapeHtml, escapeAttr } from './utils.js';
-import { urlInput, welcome, tabsList, pinnedList, sidebarPinnedTabs, tabContextMenu, webviewContainer } from './dom.js';
+import { urlInput, welcome, tabsList, pinnedList, sidebarPinnedTabs, tabContextMenu } from './dom.js';
 
 import { renderIcon } from './icon.js';
 
 // Pre-render the default tab icon SVG once
 const defaultTabIconSvg = renderIcon(MdOutlineTab, 14);
 
-// --- Webview map: tabId → <webview> element ---
-const webviews = new Map();
+// --- Bounds tracking ---
+// Sends the content-frame position/size to the main process so it can
+// position the active WebContentsView exactly over the content area.
 
-// --- Helpers ---
+export function setupBoundsTracking() {
+  const contentFrame = document.querySelector('.content-frame');
 
-function getActiveWebview() {
-  if (!state.activeTabId) return null;
-  return webviews.get(state.activeTabId) || null;
-}
-
-// Expose for events.js
-export { getActiveWebview };
-
-function createWebview(tabId, url) {
-  const wv = document.createElement('webview');
-  wv.setAttribute('partition', 'persist:portal');
-  wv.setAttribute('allowpopups', '');
-  wv.classList.add('tab-webview');
-  wv.dataset.tabId = tabId;
-
-  // Initially hidden
-  wv.style.display = 'none';
-
-  // Set src
-  if (url) {
-    wv.setAttribute('src', url);
+  function sendBounds() {
+    const rect = contentFrame.getBoundingClientRect();
+    const style = getComputedStyle(contentFrame);
+    const borderLeft = parseFloat(style.borderLeftWidth) || 0;
+    const borderTop = parseFloat(style.borderTopWidth) || 0;
+    window.portal.setTabViewBounds({
+      x: Math.round(rect.x + borderLeft),
+      y: Math.round(rect.y + borderTop),
+      width: Math.round(contentFrame.clientWidth),
+      height: Math.round(contentFrame.clientHeight),
+    });
   }
 
-  // Wire up events
-  wv.addEventListener('did-start-loading', () => {
+  const observer = new ResizeObserver(sendBounds);
+  observer.observe(contentFrame);
+  window.addEventListener('resize', sendBounds);
+
+  // Initial bounds after layout settles
+  requestAnimationFrame(() => sendBounds());
+}
+
+// --- Tab view event handlers (main -> renderer) ---
+
+export function setupTabViewEvents() {
+  window.portal.onTabDidStartLoading((tabId) => {
     const tab = state.tabs.find(t => t.id === tabId);
     if (tab) {
       tab.loading = true;
@@ -48,7 +52,7 @@ function createWebview(tabId, url) {
     }
   });
 
-  wv.addEventListener('did-stop-loading', () => {
+  window.portal.onTabDidStopLoading((tabId) => {
     const tab = state.tabs.find(t => t.id === tabId);
     if (tab) {
       tab.loading = false;
@@ -56,89 +60,53 @@ function createWebview(tabId, url) {
     }
   });
 
-  wv.addEventListener('page-title-updated', (e) => {
+  window.portal.onTabPageTitleUpdated((tabId, title) => {
     const tab = state.tabs.find(t => t.id === tabId);
     if (!tab) return;
-    tab.title = e.title || getDomain(tab.url);
+    tab.title = title || getDomain(tab.url);
     persistUpdateTab(tabId, { title: tab.title });
     renderTabs();
 
     // Google auth detection: if blocked, open in system browser
-    if (e.title.toLowerCase().includes("couldn't sign you in")) {
-      const currentUrl = wv.getURL();
-      window.portal.openExternal(currentUrl);
-      wv.loadURL('about:blank');
-      wv.executeJavaScript(`
-        document.body.style.cssText = 'background:#0a0a0b;color:#fff;font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0';
-        document.body.innerHTML = '<div style="text-align:center;max-width:400px"><h2 style="font-weight:600;margin-bottom:12px">Signing in via your browser</h2><p style="color:#888;line-height:1.6">Google requires sign-in from a standard browser. A window has been opened in your default browser.<br><br>After signing in, come back here and reload the page.</p></div>';
-      `).catch(() => {});
+    if (title && title.toLowerCase().includes("couldn't sign you in")) {
+      window.portal.openExternal(tab.url);
     }
   });
 
-  wv.addEventListener('page-favicon-updated', (e) => {
+  window.portal.onTabPageFaviconUpdated((tabId, favicons) => {
     const tab = state.tabs.find(t => t.id === tabId);
     if (!tab) return;
-    if (e.favicons && e.favicons.length > 0) {
-      tab.favicon = e.favicons[0];
+    if (favicons && favicons.length > 0) {
+      tab.favicon = favicons[0];
       persistUpdateTab(tabId, { favicon: tab.favicon });
       renderTabs();
     }
   });
 
-  wv.addEventListener('did-navigate', (e) => {
+  window.portal.onTabDidNavigate((tabId, url) => {
     const tab = state.tabs.find(t => t.id === tabId);
     if (!tab) return;
-    tab.url = e.url;
+    tab.url = url;
     persistUpdateTab(tabId, { url: tab.url });
     if (state.activeTabId === tabId) {
-      urlInput.value = e.url;
+      urlInput.value = url;
     }
   });
 
-  wv.addEventListener('did-navigate-in-page', (e) => {
-    if (!e.isMainFrame) return;
+  window.portal.onTabDidNavigateInPage((tabId, url, isMainFrame) => {
+    if (!isMainFrame) return;
     const tab = state.tabs.find(t => t.id === tabId);
     if (!tab) return;
-    tab.url = e.url;
+    tab.url = url;
     persistUpdateTab(tabId, { url: tab.url });
     if (state.activeTabId === tabId) {
-      urlInput.value = e.url;
+      urlInput.value = url;
     }
   });
 
-  // New window requests → open as new tab
-  wv.addEventListener('new-window', (e) => {
-    e.preventDefault();
-    if (e.url) {
-      createTab(e.url);
-    }
+  window.portal.onTabNewWindow((url) => {
+    if (url) createTab(url);
   });
-
-  // Add to container
-  webviewContainer.appendChild(wv);
-  webviews.set(tabId, wv);
-  return wv;
-}
-
-function destroyWebview(tabId) {
-  const wv = webviews.get(tabId);
-  if (wv) {
-    wv.remove();
-    webviews.delete(tabId);
-  }
-}
-
-function showWebview(tabId) {
-  // Hide all, show the active one
-  for (const [id, wv] of webviews) {
-    wv.style.display = id === tabId ? '' : 'none';
-  }
-}
-
-function hideAllWebviews() {
-  for (const [, wv] of webviews) {
-    wv.style.display = 'none';
-  }
 }
 
 // --- Persist helpers ---
@@ -196,8 +164,8 @@ export function createTab(url) {
   };
   state.tabs.push(tab);
 
-  // Create webview
-  createWebview(id, url);
+  // Create tab view in main process
+  window.portal.createTabView(id, url);
 
   activateTab(id);
   renderTabs();
@@ -218,7 +186,7 @@ export function restoreTab(dbRow) {
   state.tabs.push(tab);
 
   if (tab.url) {
-    createWebview(tab.id, tab.url);
+    window.portal.createTabView(tab.id, tab.url);
   }
 
   return tab;
@@ -236,19 +204,16 @@ export function navigateTab(id, url) {
   tab.loading = true;
 
   if (hadUrl) {
-    // Webview already exists — navigate it
-    const wv = webviews.get(id);
-    if (wv) {
-      wv.loadURL(url);
-    }
+    // Tab view already exists — navigate it
+    window.portal.navigateTabView(id, url);
   } else {
-    // New Tab had no webview — create one
-    createWebview(id, url);
+    // New Tab had no view — create one
+    window.portal.createTabView(id, url);
   }
 
-  // Show the webview, hide welcome
+  // Show the tab view, hide welcome
   welcome.classList.add('hidden');
-  showWebview(id);
+  window.portal.showTabView(id);
 
   persistUpdateTab(id, { url: tab.url, title: tab.title, favicon: null });
   renderTabs();
@@ -267,9 +232,9 @@ export function activateTab(id) {
   welcome.classList.toggle('hidden', hasUrl);
 
   if (hasUrl) {
-    showWebview(id);
+    window.portal.showTabView(id);
   } else {
-    hideAllWebviews();
+    window.portal.hideAllTabViews();
   }
 
   persistUpdateTab(id, { isActive: true });
@@ -282,8 +247,8 @@ export function closeTab(id) {
 
   state.tabs.splice(idx, 1);
 
-  // Destroy the webview
-  destroyWebview(id);
+  // Destroy the tab view in main process
+  window.portal.destroyTabView(id);
 
   const bar = document.querySelector(`.loading-bar[data-tab-id="${id}"]`);
   if (bar) bar.remove();
@@ -298,7 +263,7 @@ export function closeTab(id) {
       state.activeTabId = null;
       urlInput.value = '';
       welcome.classList.remove('hidden');
-      hideAllWebviews();
+      window.portal.hideAllTabViews();
     }
   }
 
