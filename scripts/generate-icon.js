@@ -34,7 +34,7 @@ app.whenReady().then(async () => {
     }
     fs.mkdirSync(ICONSET_DIR);
 
-    // Render at 1024x1024 (largest needed)
+    // Render at 1024x1024 — matches the HTML body size
     const win = new BrowserWindow({
       width: 1024,
       height: 1024,

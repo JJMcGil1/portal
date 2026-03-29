@@ -61,8 +61,8 @@ function setupLiveReload(win) {
 
 async function generateAppIcon() {
   const iconWindow = new BrowserWindow({
-    width: 512,
-    height: 512,
+    width: 1024,
+    height: 1024,
     show: false,
     frame: false,
     transparent: true,
