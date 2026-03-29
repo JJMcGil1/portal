@@ -276,7 +276,7 @@
 
 .account-name {
   font-size: var(--text-sm);
-  font-weight: 400;
+  font-weight: 500;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;

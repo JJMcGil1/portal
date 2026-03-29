@@ -41,7 +41,10 @@ export function setupEvents() {
     if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
       e.preventDefault();
       if (state.activeTabId) {
-        closeTab(state.activeTabId);
+        const activeTab = state.tabs.find(t => t.id === state.activeTabId);
+        if (activeTab && !activeTab.pinned) {
+          closeTab(state.activeTabId);
+        }
       }
     }
   });
@@ -62,19 +65,23 @@ export function setupEvents() {
 
   backBtn.addEventListener('click', () => {
     if (state.activeTabId) {
-      window.portal.tabGoBack(state.activeTabId);
+      const tab = state.tabs.find(t => t.id === state.activeTabId);
+      if (tab && !tab.pinned) window.portal.tabGoBack(state.activeTabId);
     }
   });
 
   forwardBtn.addEventListener('click', () => {
     if (state.activeTabId) {
-      window.portal.tabGoForward(state.activeTabId);
+      const tab = state.tabs.find(t => t.id === state.activeTabId);
+      if (tab && !tab.pinned) window.portal.tabGoForward(state.activeTabId);
     }
   });
 
   reloadBtn.addEventListener('click', () => {
     if (state.activeTabId) {
+      reloadBtn.classList.add('spinning');
       window.portal.tabReload(state.activeTabId);
+      setTimeout(() => reloadBtn.classList.remove('spinning'), 600);
     }
   });
 }

@@ -21,12 +21,11 @@
     <header id="titlebar" class="titlebar">
       <div class="titlebar-drag-region"></div>
 
-      <!-- Left: traffic light spacer + sidebar toggle + logo -->
+      <!-- Left: logo + sidebar toggle (aligned within sidebar width) -->
       <div class="titlebar-left">
-        <button class="icon-btn sidebar-collapse-btn" id="sidebar-collapse-btn" title="Toggle sidebar"></button>
         <div class="titlebar-logo">
           <!-- Dark mode logo -->
-          <svg class="logo-icon logo-icon-dark" width="20" height="23" viewBox="0 0 120 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg class="logo-icon logo-icon-dark" viewBox="0 0 120 140" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="tb-fD" x1="0.2" y1="0" x2="0.8" y2="1"><stop offset="0%" stop-color="#1E1B2E"/><stop offset="100%" stop-color="#2D2640"/></linearGradient>
               <radialGradient id="tb-pD" cx="0.5" cy="0.43" r="0.55"><stop offset="0%" stop-color="#FDFCFF"/><stop offset="22%" stop-color="#F3E8FF"/><stop offset="45%" stop-color="#E9D5FF"/><stop offset="65%" stop-color="#D8B4FE"/><stop offset="85%" stop-color="#C4B5FD"/><stop offset="100%" stop-color="#B197FC"/></radialGradient>
@@ -51,7 +50,7 @@
             </g>
           </svg>
           <!-- Light mode logo -->
-          <svg class="logo-icon logo-icon-light" width="20" height="23" viewBox="0 0 120 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <svg class="logo-icon logo-icon-light" viewBox="0 0 120 140" fill="none" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <linearGradient id="tb-fL" x1="0.2" y1="0" x2="0.8" y2="1"><stop offset="0%" stop-color="#F5F3FF"/><stop offset="100%" stop-color="#DDD6FE"/></linearGradient>
               <radialGradient id="tb-pL" cx="0.5" cy="0.43" r="0.55"><stop offset="0%" stop-color="#FDFCFF"/><stop offset="22%" stop-color="#F3E8FF"/><stop offset="45%" stop-color="#E9D5FF"/><stop offset="65%" stop-color="#D8B4FE"/><stop offset="85%" stop-color="#C4B5FD"/><stop offset="100%" stop-color="#B197FC"/></radialGradient>
@@ -79,8 +78,15 @@
         </div>
       </div>
 
-      <!-- Center: URL / Search bar -->
+      <!-- Center: nav controls + URL bar + devtools -->
       <div class="titlebar-center">
+        <div class="titlebar-nav-group">
+          <button class="icon-btn" id="sidebar-collapse-btn" title="Toggle sidebar"></button>
+          <div class="nav-divider"></div>
+          <button class="icon-btn" id="back-btn" title="Go back"></button>
+          <button class="icon-btn" id="forward-btn" title="Go forward"></button>
+          <button class="icon-btn" id="reload-btn" title="Reload"></button>
+        </div>
         <div class="titlebar-url-bar">
           <div class="url-input-icon"></div>
           <input
@@ -91,23 +97,15 @@
             autocomplete="off"
           />
         </div>
+        <button class="icon-btn" id="devtools-btn" title="Toggle DevTools"></button>
       </div>
 
-      <!-- Right: nav + actions -->
+      <!-- Right: theme toggle -->
       <div class="titlebar-right">
-        <div class="titlebar-group">
-          <button class="icon-btn" id="back-btn" title="Go back"></button>
-          <button class="icon-btn" id="forward-btn" title="Go forward"></button>
-          <button class="icon-btn" id="reload-btn" title="Reload"></button>
-        </div>
-        <div class="titlebar-divider"></div>
-        <div class="titlebar-group">
-          <button class="icon-btn" id="devtools-btn" title="Toggle DevTools"></button>
-          <button class="icon-btn" id="theme-toggle-btn" title="Toggle light/dark mode">
-            <span class="theme-icon theme-icon-sun"></span>
-            <span class="theme-icon theme-icon-moon"></span>
-          </button>
-        </div>
+        <button class="icon-btn" id="theme-toggle-btn" title="Toggle light/dark mode">
+          <span class="theme-icon theme-icon-sun"></span>
+          <span class="theme-icon theme-icon-moon"></span>
+        </button>
       </div>
     </header>
 

@@ -12,6 +12,7 @@
 body {
   font-family: var(--font-sans);
   font-size: var(--text-base);
+  font-weight: 450;
   color: var(--text-primary);
   background: var(--bg-primary);
   overflow: hidden;

@@ -1,6 +1,6 @@
 // Sidebar collapse / pin logic
 // Overlay behavior is handled entirely by floating-sidebar.js
-import { VscLayoutSidebarLeft, VscLayoutSidebarLeftOff } from 'react-icons/vsc';
+import { PiSidebar } from 'react-icons/pi';
 import { appBody, sidebarCollapseBtn, sidebarTrigger, sidebar } from './dom.js';
 import { renderIcon } from './icon.js';
 import { hideFloatingSidebar, isFloatingVisible } from './floating-sidebar.js';
@@ -14,10 +14,10 @@ function setState(next) {
   if (next === 'pinned') {
     hideFloatingSidebar();
     appBody.classList.remove('sidebar-collapsed');
-    sidebarCollapseBtn.innerHTML = renderIcon(VscLayoutSidebarLeft);
+    sidebarCollapseBtn.innerHTML = renderIcon(PiSidebar, 18);
   } else {
     appBody.classList.add('sidebar-collapsed');
-    sidebarCollapseBtn.innerHTML = renderIcon(VscLayoutSidebarLeftOff);
+    sidebarCollapseBtn.innerHTML = renderIcon(PiSidebar, 18);
   }
 }
 

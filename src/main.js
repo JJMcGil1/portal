@@ -7,6 +7,14 @@ const fs = require('fs');
 const database = require('./database.js');
 const autoUpdater = require('./auto-updater.js');
 
+// Crash diagnostics — catch silent deaths
+process.on('uncaughtException', (err) => {
+  console.error('[CRASH] Uncaught exception:', err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[CRASH] Unhandled rejection:', reason);
+});
+
 // Force dark mode at the Chromium level
 app.commandLine.appendSwitch('force-dark-mode');
 
@@ -34,6 +42,8 @@ let mainWindow;
 
 // --- Tab View Management ---
 const tabViews = new Map(); // tabId -> WebContentsView
+const pinnedTabs = new Map(); // tabId -> pinnedUrl (used to intercept cross-origin nav)
+const pinnedTabRestoring = new Set(); // tabIds currently being restored to their pinned URL
 let activeTabViewId = null;
 let contentBounds = { x: 0, y: 0, width: 800, height: 600 };
 
@@ -48,6 +58,8 @@ function setupLiveReload(win) {
 
   fs.watch(srcDir, { recursive: true }, (eventType, filename) => {
     if (!filename || filename.startsWith('.')) return;
+    // Ignore build output directory — esbuild writes to src/dist/
+    if (filename.startsWith('dist/') || filename.startsWith('dist\\')) return;
 
     if (debounce[filename]) return;
     debounce[filename] = true;
@@ -165,6 +177,20 @@ function createTabView(tabId, url) {
   });
 
   const wc = view.webContents;
+
+  // Guard: wrap event handler to skip if webContents has been destroyed
+  const safeOn = (event, handler) => {
+    wc.on(event, (...args) => {
+      if (wc.isDestroyed()) return;
+      try {
+        handler(...args);
+      } catch (e) {
+        if (e?.message?.includes('destroyed')) return;
+        throw e;
+      }
+    });
+  };
+
   const chromeUA = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`;
 
   // Register view in map AND add to window IMMEDIATELY so showTabView can
@@ -180,9 +206,18 @@ function createTabView(tabId, url) {
   // Google falls back to parsing the User-Agent string, which this controls.
   wc.setUserAgent(chromeUA);
 
+  // Crash detection — log when a tab's renderer process dies
+  safeOn('render-process-gone', (event, details) => {
+    log.warn('tab:' + tabId, `Renderer process gone: reason=${details.reason}, exitCode=${details.exitCode}`);
+  });
+
+  wc.on('destroyed', () => {
+    log.tab(tabId, 'Destroyed');
+  });
+
   // Dark mode injection
-  wc.on('did-finish-load', () => injectDarkMode(wc));
-  wc.on('did-navigate', (event, navUrl) => {
+  safeOn('did-finish-load', () => injectDarkMode(wc));
+  safeOn('did-navigate', (event, navUrl) => {
     injectDarkMode(wc);
 
     // Google sign-in detection: if Google rejects sign-in, open in system browser.
@@ -199,34 +234,121 @@ function createTabView(tabId, url) {
   });
 
   // Forward events to the renderer UI
-  wc.on('did-start-loading', () => {
+  safeOn('did-start-loading', () => {
     mainWindow?.webContents.send('tab-did-start-loading', tabId);
   });
 
-  wc.on('did-stop-loading', () => {
+  safeOn('did-stop-loading', () => {
     mainWindow?.webContents.send('tab-did-stop-loading', tabId);
   });
 
-  wc.on('page-title-updated', (event, title) => {
+  safeOn('page-title-updated', (event, title) => {
     mainWindow?.webContents.send('tab-page-title-updated', tabId, title);
   });
 
-  wc.on('page-favicon-updated', (event, favicons) => {
+  safeOn('page-favicon-updated', (event, favicons) => {
     mainWindow?.webContents.send('tab-page-favicon-updated', tabId, favicons);
   });
 
-  wc.on('did-navigate', (event, navUrl) => {
+  safeOn('did-navigate', (event, navUrl) => {
     mainWindow?.webContents.send('tab-did-navigate', tabId, navUrl);
   });
 
-  wc.on('did-navigate-in-page', (event, navUrl, isMainFrame) => {
+  safeOn('did-navigate-in-page', (event, navUrl, isMainFrame) => {
     mainWindow?.webContents.send('tab-did-navigate-in-page', tabId, navUrl, isMainFrame);
   });
 
-  // Popup / target=_blank -> open as new tab
-  wc.setWindowOpenHandler(({ url: openUrl }) => {
-    mainWindow?.webContents.send('tab-new-window', openUrl);
+  // Pinned tab protection: block ALL navigations away from the pinned URL
+  safeOn('will-navigate', (event, navUrl) => {
+    const pinnedUrl = pinnedTabs.get(tabId);
+    if (!pinnedUrl) return;
+    // Allow navigating to the exact pinned URL (e.g. reload)
+    if (navUrl === pinnedUrl) return;
+    event.preventDefault();
+    log.tab(tabId, `Pinned tab: blocked nav to ${navUrl}, opening in new tab`);
+    mainWindow?.webContents.send('tab-new-window', navUrl);
+  });
+
+  // Pinned tab safety net: catch navigations that slipped past will-navigate
+  // (e.g. JS-initiated navigations, redirects)
+  safeOn('did-navigate', (event, navUrl) => {
+    const pinnedUrl = pinnedTabs.get(tabId);
+    if (!pinnedUrl) return;
+    // If we're restoring the pinned tab back to its URL, just clear the flag
+    if (pinnedTabRestoring.has(tabId)) {
+      pinnedTabRestoring.delete(tabId);
+      return;
+    }
+    if (navUrl === pinnedUrl) return;
+    log.tab(tabId, `Pinned tab escaped to ${navUrl}, opening in new tab and restoring`);
+    mainWindow?.webContents.send('tab-new-window', navUrl);
+    pinnedTabRestoring.add(tabId);
+    wc.loadURL(pinnedUrl);
+  });
+
+  // Pinned tab: catch SPA navigations (pushState/replaceState) that bypass will-navigate
+  safeOn('did-navigate-in-page', (event, navUrl, isMainFrame) => {
+    if (!isMainFrame) return;
+    const pinnedUrl = pinnedTabs.get(tabId);
+    if (!pinnedUrl) return;
+    // Allow hash-only changes on the same page (e.g. scrolling to anchors)
+    try {
+      const pinned = new URL(pinnedUrl);
+      const nav = new URL(navUrl);
+      pinned.hash = '';
+      nav.hash = '';
+      if (pinned.href === nav.href) return; // same page, different hash — allow
+    } catch (e) {}
+    if (navUrl === pinnedUrl) return;
+    log.tab(tabId, `Pinned tab SPA nav to ${navUrl}, opening in new tab and going back`);
+    mainWindow?.webContents.send('tab-new-window', navUrl);
+    wc.goBack();
+  });
+
+  // Popup / target=_blank handling
+  wc.setWindowOpenHandler(({ url: openUrl, disposition }) => {
+    try {
+      // OAuth popups (Google, Apple, etc.) need a real popup window with
+      // window.opener intact so postMessage / storagerelay:// flow works.
+      // Using action:'allow' lets Electron create the child window with the
+      // correct opener reference. We configure it via overrideBrowserWindowOptions.
+      if (openUrl.includes('accounts.google.com/o/oauth2') ||
+          openUrl.includes('accounts.google.com/signin/oauth') ||
+          openUrl.includes('appleid.apple.com/auth')) {
+        log.tab(tabId, `Opening OAuth popup: ${openUrl.substring(0, 80)}…`);
+        return {
+          action: 'allow',
+          overrideBrowserWindowOptions: {
+            width: 500,
+            height: 700,
+            resizable: true,
+            parent: mainWindow,
+            webPreferences: {
+              partition: 'persist:portal',
+              contextIsolation: true,
+              nodeIntegration: false,
+              sandbox: true,
+            },
+          },
+        };
+      }
+      mainWindow?.webContents.send('tab-new-window', openUrl);
+    } catch (e) {
+      if (!e?.message?.includes('destroyed')) throw e;
+    }
     return { action: 'deny' };
+  });
+
+  // Handle OAuth popup lifecycle after Electron creates it
+  wc.on('did-create-window', (childWindow) => {
+    log.tab(tabId, `OAuth popup window created`);
+    // Auto-close when OAuth redirects to storagerelay:// (token delivered via postMessage)
+    childWindow.webContents.on('will-navigate', (e, navUrl) => {
+      if (navUrl.startsWith('storagerelay://')) {
+        log.tab(tabId, `OAuth complete, closing popup`);
+        childWindow.close();
+      }
+    });
   });
 
   // Navigate
@@ -314,6 +436,16 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
+
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
+    log.warn('app', `Main renderer process gone: reason=${details.reason}, exitCode=${details.exitCode}`);
+  });
+  mainWindow.on('unresponsive', () => {
+    log.warn('app', 'Window became unresponsive');
+  });
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    log.warn('app', `Main renderer failed to load: ${errorCode} ${errorDescription} ${validatedURL}`);
+  });
 
   // Set app icon — only needed in dev mode; packaged app uses bundled .icns
   if (!app.isPackaged) {
@@ -414,6 +546,10 @@ app.whenReady().then(async () => {
   log.session('Session configured: UA spoofing, header rewriting, CSP stripping, permission grants');
   log.session(`UA: Chrome/${chromeVersion} on macOS`);
 
+  app.on('child-process-gone', (event, details) => {
+    log.warn('app', `Child process gone: type=${details.type}, reason=${details.reason}, exitCode=${details.exitCode}, name=${details.name || 'unknown'}`);
+  });
+
   createWindow();
   log.app('Window created — ready');
 
@@ -452,30 +588,38 @@ ipcMain.handle('tab-view-hide-all', () => {
 
 ipcMain.handle('tab-view-navigate', (_, tabId, url) => {
   url = sanitizeUrl(url);
+  // Don't navigate pinned tabs — renderer should handle this, but safety net
+  if (pinnedTabs.has(tabId)) {
+    log.tab(tabId, `Blocked navigate on pinned tab → ${url}, opening in new tab`);
+    mainWindow?.webContents.send('tab-new-window', url);
+    return;
+  }
   const view = tabViews.get(tabId);
-  if (view) {
+  if (view && !view.webContents.isDestroyed()) {
     log.tab(tabId, `Navigating → ${url}`);
     view.webContents.loadURL(url);
   }
 });
 
 ipcMain.handle('tab-view-go-back', (_, tabId) => {
+  if (pinnedTabs.has(tabId)) return; // pinned tabs don't navigate
   const view = tabViews.get(tabId);
-  if (view && view.webContents.canGoBack()) {
+  if (view && !view.webContents.isDestroyed() && view.webContents.canGoBack()) {
     view.webContents.goBack();
   }
 });
 
 ipcMain.handle('tab-view-go-forward', (_, tabId) => {
+  if (pinnedTabs.has(tabId)) return; // pinned tabs don't navigate
   const view = tabViews.get(tabId);
-  if (view && view.webContents.canGoForward()) {
+  if (view && !view.webContents.isDestroyed() && view.webContents.canGoForward()) {
     view.webContents.goForward();
   }
 });
 
 ipcMain.handle('tab-view-reload', (_, tabId) => {
   const view = tabViews.get(tabId);
-  if (view) {
+  if (view && !view.webContents.isDestroyed()) {
     view.webContents.reload();
   }
 });
@@ -515,6 +659,11 @@ ipcMain.handle('db-delete-saved', (_, id) => database.deleteSaved(id));
 ipcMain.handle('db-get-profile', () => database.getProfile());
 ipcMain.handle('db-update-profile', (_, fields) => database.updateProfile(fields));
 ipcMain.handle('db-reorder-pinned-tabs', (_, orderedIds) => database.reorderPinnedTabs(orderedIds));
+
+// Pinned tab state sync (renderer tells main which tabs are pinned)
+ipcMain.handle('tab-set-pinned', (_, tabId, url) => { pinnedTabs.set(tabId, url); });
+ipcMain.handle('tab-unset-pinned', (_, tabId) => { pinnedTabs.delete(tabId); });
+
 // Legacy
 ipcMain.handle('load-data', () => ({ sites: database.getAllSaved() }));
 ipcMain.handle('save-data', () => {});

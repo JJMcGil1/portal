@@ -33,17 +33,18 @@ body.light-mode .titlebar {
 }
 
 body.light-mode .titlebar-url-bar input {
-  background: var(--bg-primary);
-  border-color: var(--border-medium);
+  background: rgba(124, 58, 237, 0.06);
   color: var(--text-primary);
 }
 
-body.light-mode .titlebar-url-bar input::placeholder {
-  color: var(--text-tertiary);
+body.light-mode .titlebar-url-bar input:hover {
+  background: rgba(124, 58, 237, 0.09);
 }
 
-body.light-mode .titlebar-divider {
-  background: rgba(124, 58, 237, 0.1);
+body.light-mode .titlebar-url-bar input:focus {
+  background: var(--bg-primary);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
 body.light-mode .sidebar {

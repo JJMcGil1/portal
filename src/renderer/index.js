@@ -2,15 +2,14 @@
 import {
   PiMagnifyingGlass,
   PiBookmarkSimple,
-  PiCaretLeft,
-  PiCaretRight,
-  PiArrowClockwise,
   PiCode,
   PiSun,
   PiMoon,
   PiPlus,
 } from 'react-icons/pi';
-import { VscLayoutSidebarLeft, VscLayoutSidebarLeftOff } from 'react-icons/vsc';
+import { GoArrowLeft, GoArrowRight } from 'react-icons/go';
+import { PiSidebar } from 'react-icons/pi';
+import { IoRefresh } from 'react-icons/io5';
 import { MdOutlineTab } from 'react-icons/md';
 import { renderIcon } from './icon.js';
 import { state, setTabIdCounter } from './state.js';
@@ -27,22 +26,22 @@ import { setupAbout } from './about.js';
 
 function initStaticIcons() {
   // Titlebar icons
-  document.getElementById('sidebar-collapse-btn').innerHTML = renderIcon(VscLayoutSidebarLeft);
-  document.querySelector('.url-input-icon').innerHTML = renderIcon(PiMagnifyingGlass, 13);
+  document.getElementById('sidebar-collapse-btn').innerHTML = renderIcon(PiSidebar, 18);
+  document.querySelector('.url-input-icon').innerHTML = renderIcon(PiMagnifyingGlass, 14);
   document.querySelector('.welcome-search-icon').innerHTML = renderIcon(PiMagnifyingGlass, 18);
-  document.getElementById('back-btn').innerHTML = renderIcon(PiCaretLeft);
-  document.getElementById('forward-btn').innerHTML = renderIcon(PiCaretRight);
-  document.getElementById('reload-btn').innerHTML = renderIcon(PiArrowClockwise, 14);
-  document.getElementById('devtools-btn').innerHTML = renderIcon(PiCode);
-  document.querySelector('.theme-icon-sun').innerHTML = renderIcon(PiSun);
-  document.querySelector('.theme-icon-moon').innerHTML = renderIcon(PiMoon);
+  document.getElementById('back-btn').innerHTML = renderIcon(GoArrowLeft, 18);
+  document.getElementById('forward-btn').innerHTML = renderIcon(GoArrowRight, 18);
+  document.getElementById('reload-btn').innerHTML = renderIcon(IoRefresh, 18);
+  document.getElementById('devtools-btn').innerHTML = renderIcon(PiCode, 18);
+  document.querySelector('.theme-icon-sun').innerHTML = renderIcon(PiSun, 18);
+  document.querySelector('.theme-icon-moon').innerHTML = renderIcon(PiMoon, 18);
 
   // Sidebar icons
   document.querySelector('#save-site-btn').innerHTML = renderIcon(PiBookmarkSimple, 14);
   document.querySelector('#new-tab-btn').innerHTML = renderIcon(PiPlus, 14);
 
   // Trigger icon
-  document.querySelector('.sidebar-trigger-icon').innerHTML = renderIcon(VscLayoutSidebarLeftOff, 18);
+  document.querySelector('.sidebar-trigger-icon').innerHTML = renderIcon(PiSidebar, 18);
 }
 
 function initWelcome() {

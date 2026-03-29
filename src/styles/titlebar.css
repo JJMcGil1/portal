@@ -7,8 +7,8 @@
   min-height: 38px;
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: 0 var(--space-2);
+  gap: 0;
+  padding: 0 10px 0 0;
   background: var(--bg-secondary);
   border-bottom: none;
   position: relative;
@@ -24,7 +24,7 @@
   z-index: 0;
 }
 
-/* All sections sit above the drag region visually, but remain draggable */
+/* All sections sit above the drag region */
 .titlebar-left,
 .titlebar-center,
 .titlebar-right {
@@ -40,56 +40,117 @@
   -webkit-app-region: no-drag;
 }
 
-/* ── Left: traffic light spacer + sidebar toggle ── */
+/* ── Left: logo + sidebar toggle ── */
 
 .titlebar-left {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: 7px;
   padding-left: 72px; /* macOS traffic light spacer */
+  padding-right: 12px;
+  flex-shrink: 0;
 }
 
-.sidebar-collapse-btn {
-  width: 28px;
-  height: 28px;
-}
-
-.sidebar-collapse-btn svg {
-  width: 16px;
-  height: 16px;
-}
+/* ── Logo ── */
 
 .titlebar-logo {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   flex-shrink: 0;
+  -webkit-app-region: no-drag;
+}
+
+.titlebar-logo .logo-icon {
+  width: 24px;
+  height: 28px;
 }
 
 .titlebar-logo .logo-text {
-  font-family: var(--font-sans);
+  font-family: 'DM Sans', var(--font-sans);
   font-size: 16px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-primary);
-  letter-spacing: -0.01em;
+  letter-spacing: 0.3px;
   user-select: none;
 }
 
-/* ── Center: URL bar ── */
+/* Theme-dependent logo visibility */
+.logo-icon-light { display: none; }
+body.light-mode .logo-icon-dark { display: none; }
+body.light-mode .logo-icon-light { display: block; }
+
+/* sidebar-collapse-btn now lives inside .titlebar-nav-group, inherits .icon-btn styles */
+
+
+/* ── Center: nav + URL bar + actions ── */
 
 .titlebar-center {
   flex: 1;
   display: flex;
-  justify-content: center;
+  align-items: center;
+  gap: 2px;
   min-width: 0;
 }
+
+/* Nav buttons — no capsule, just ghost buttons inline */
+.titlebar-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+  background: none;
+  border-radius: 0;
+  padding: 0;
+}
+
+.titlebar-nav-group .icon-btn {
+  width: 30px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--text-tertiary);
+  transition: color 120ms ease-out, background 120ms ease-out;
+}
+
+.titlebar-nav-group .icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.titlebar-nav-group .icon-btn:active {
+  background: var(--bg-active);
+  transform: scale(0.94);
+}
+
+.nav-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--border-medium);
+  margin: 0 6px;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+/* Reload spin animation */
+#reload-btn.spinning svg {
+  animation: reload-spin 0.6s ease-out;
+}
+
+@keyframes reload-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+
+/* ── URL bar — soft, borderless, hero element ── */
 
 .titlebar-url-bar {
   position: relative;
   display: flex;
   align-items: center;
-  width: 100%;
-  max-width: 560px;
+  flex: 1;
+  margin: 0 6px;
+  min-width: 120px;
 }
 
 .titlebar-url-bar .url-input-icon {
@@ -99,40 +160,91 @@
   pointer-events: none;
   display: flex;
   align-items: center;
-  transition: color var(--duration-fast) var(--ease-out);
+  transition: color 120ms ease-out;
+  opacity: 0.7;
 }
 
 .titlebar-url-bar input {
   width: 100%;
-  padding: 4px 12px 4px 32px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border-subtle);
-  border-radius: 20px;
+  height: 28px;
+  padding: 0 12px 0 30px;
+  background: var(--bg-tertiary);
+  border: 1.5px solid transparent;
+  border-radius: 10px;
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   outline: none;
-  transition: border-color var(--duration-fast) var(--ease-out),
-              box-shadow var(--duration-fast) var(--ease-out),
-              background var(--duration-fast) var(--ease-out);
+  transition: background 150ms ease-out,
+              border-color 150ms ease-out,
+              box-shadow 150ms ease-out;
 }
 
 .titlebar-url-bar input::placeholder {
   color: var(--text-tertiary);
+  text-align: center;
+}
+
+.titlebar-url-bar input:hover {
+  background: var(--bg-hover);
 }
 
 .titlebar-url-bar input:focus {
+  background: var(--bg-primary);
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-glow);
-  background: var(--bg-tertiary);
 }
 
-/* ── Right: nav + actions ── */
+.titlebar-url-bar input:focus::placeholder {
+  text-align: left;
+}
+
+.titlebar-url-bar input:focus ~ .url-input-icon {
+  color: var(--accent);
+  opacity: 1;
+}
+
+
+/* ── Action buttons (devtools, theme) — uniform ghost buttons ── */
+
+#devtools-btn {
+  width: 30px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--text-tertiary);
+  background: none;
+  flex-shrink: 0;
+  padding: 0;
+  font-size: inherit;
+  font-family: inherit;
+  font-weight: inherit;
+}
+
+#devtools-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+
+/* ── Right: theme toggle ── */
 
 .titlebar-right {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  margin-left: 2px;
+  flex-shrink: 0;
+}
+
+#theme-toggle-btn {
+  width: 30px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--text-tertiary);
+}
+
+#theme-toggle-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .titlebar-group {
@@ -141,9 +253,3 @@
   gap: 2px;
 }
 
-.titlebar-divider {
-  width: 1px;
-  height: 16px;
-  background: var(--border-medium);
-  margin: 0 var(--space-1);
-}

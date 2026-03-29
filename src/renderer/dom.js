@@ -20,3 +20,4 @@ export const pinnedList = document.getElementById('pinned-list');
 export const sidebarPinnedTabs = document.getElementById('sidebar-pinned-tabs');
 export const tabContextMenu = document.getElementById('tab-context-menu');
 export const welcomeSearchInput = document.getElementById('welcome-search-input');
+export const titlebarLeft = document.querySelector('.titlebar-left');

@@ -48,6 +48,10 @@ contextBridge.exposeInMainWorld('portal', {
   // Pinned tab reorder
   reorderPinnedTabs: (orderedIds) => ipcRenderer.invoke('db-reorder-pinned-tabs', orderedIds),
 
+  // Pinned tab state sync
+  setPinnedTab: (tabId, url) => ipcRenderer.invoke('tab-set-pinned', tabId, url),
+  unsetPinnedTab: (tabId) => ipcRenderer.invoke('tab-unset-pinned', tabId),
+
   // Legacy
   loadData: () => ipcRenderer.invoke('load-data'),
   saveData: (data) => ipcRenderer.invoke('save-data', data),

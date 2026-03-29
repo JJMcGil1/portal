@@ -35,6 +35,10 @@ function init(win) {
 }
 
 function setupIPC() {
+  // Remove any existing handlers first (safe during live reload)
+  const channels = ['updater-check', 'updater-download', 'updater-install', 'updater-dismiss', 'updater-get-version'];
+  channels.forEach(ch => { try { ipcMain.removeHandler(ch); } catch {} });
+
   ipcMain.handle('updater-check', () => checkForUpdates());
   ipcMain.handle('updater-download', () => downloadUpdate());
   ipcMain.handle('updater-install', () => installUpdate());

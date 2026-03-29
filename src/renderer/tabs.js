@@ -63,19 +63,24 @@ export function setupTabViewEvents() {
   window.portal.onTabPageTitleUpdated((tabId, title) => {
     const tab = state.tabs.find(t => t.id === tabId);
     if (!tab) return;
-    tab.title = title || getDomain(tab.url);
-    persistUpdateTab(tabId, { title: tab.title });
-    renderTabs();
 
     // Google auth detection: if blocked, open in system browser
     if (title && title.toLowerCase().includes("couldn't sign you in")) {
       window.portal.openExternal(tab.url);
     }
+
+    // Pinned tabs: don't update title — keep pinned identity frozen
+    if (tab.pinned) return;
+    tab.title = title || getDomain(tab.url);
+    persistUpdateTab(tabId, { title: tab.title });
+    renderTabs();
   });
 
   window.portal.onTabPageFaviconUpdated((tabId, favicons) => {
     const tab = state.tabs.find(t => t.id === tabId);
     if (!tab) return;
+    // Pinned tabs: don't update favicon — keep pinned identity frozen
+    if (tab.pinned) return;
     if (favicons && favicons.length > 0) {
       tab.favicon = favicons[0];
       persistUpdateTab(tabId, { favicon: tab.favicon });
@@ -86,6 +91,8 @@ export function setupTabViewEvents() {
   window.portal.onTabDidNavigate((tabId, url) => {
     const tab = state.tabs.find(t => t.id === tabId);
     if (!tab) return;
+    // Pinned tabs: don't update anything — keep the pinned identity frozen
+    if (tab.pinned) return;
     tab.url = url;
     persistUpdateTab(tabId, { url: tab.url });
     if (state.activeTabId === tabId) {
@@ -97,6 +104,8 @@ export function setupTabViewEvents() {
     if (!isMainFrame) return;
     const tab = state.tabs.find(t => t.id === tabId);
     if (!tab) return;
+    // Pinned tabs: don't update anything — keep the pinned identity frozen
+    if (tab.pinned) return;
     tab.url = url;
     persistUpdateTab(tabId, { url: tab.url });
     if (state.activeTabId === tabId) {
@@ -141,6 +150,7 @@ export function createNewTab() {
     favicon: null,
     loading: false,
     pinned: false,
+    pinnedUrl: null,
   };
   state.tabs.push(tab);
   activateTab(id);
@@ -161,6 +171,7 @@ export function createTab(url) {
     favicon: null,
     loading: true,
     pinned: false,
+    pinnedUrl: null,
   };
   state.tabs.push(tab);
 
@@ -175,18 +186,33 @@ export function createTab(url) {
 
 // Restore a tab from the database (on app startup)
 export function restoreTab(dbRow) {
+  // Don't restore ephemeral OAuth/auth tabs — their tokens are expired
+  if (dbRow.url && (
+    dbRow.url.includes('accounts.google.com/o/oauth2') ||
+    dbRow.url.includes('accounts.google.com/signin/oauth') ||
+    dbRow.url.includes('appleid.apple.com/auth')
+  )) {
+    return null;
+  }
+  const isPinned = !!dbRow.is_pinned;
   const tab = {
     id: dbRow.id,
     url: dbRow.url,
     title: dbRow.title || getDomain(dbRow.url) || 'New Tab',
     favicon: dbRow.favicon || null,
     loading: false,
-    pinned: !!dbRow.is_pinned,
+    pinned: isPinned,
+    pinnedUrl: isPinned ? dbRow.url : null,
   };
   state.tabs.push(tab);
 
   if (tab.url) {
     window.portal.createTabView(tab.id, tab.url);
+  }
+
+  // Sync pinned state to main process so will-navigate interception works
+  if (isPinned && tab.url) {
+    window.portal.setPinnedTab(tab.id, tab.url);
   }
 
   return tab;
@@ -196,6 +222,12 @@ export function restoreTab(dbRow) {
 export function navigateTab(id, url) {
   const tab = state.tabs.find((t) => t.id === id);
   if (!tab) return;
+
+  // Pinned tabs: open URL in a new tab instead of navigating the pinned one
+  if (tab.pinned) {
+    createTab(url);
+    return;
+  }
 
   const hadUrl = tab.url !== '';
   tab.url = url;
@@ -245,6 +277,9 @@ export function closeTab(id) {
   const idx = state.tabs.findIndex((t) => t.id === id);
   if (idx === -1) return;
 
+  // Pinned tabs cannot be closed — must unpin first
+  if (state.tabs[idx].pinned) return;
+
   state.tabs.splice(idx, 1);
 
   // Destroy the tab view in main process
@@ -274,7 +309,9 @@ export function pinTab(id) {
   const tab = state.tabs.find((t) => t.id === id);
   if (!tab) return;
   tab.pinned = true;
+  tab.pinnedUrl = tab.url; // remember the URL this tab was pinned at
   persistUpdateTab(id, { isPinned: true });
+  window.portal.setPinnedTab(id, tab.url); // sync to main process for nav interception
   renderTabs();
 }
 
@@ -282,7 +319,9 @@ export function unpinTab(id) {
   const tab = state.tabs.find((t) => t.id === id);
   if (!tab) return;
   tab.pinned = false;
+  tab.pinnedUrl = null;
   persistUpdateTab(id, { isPinned: false });
+  window.portal.unsetPinnedTab(id); // clear from main process
   renderTabs();
 }
 
@@ -356,6 +395,13 @@ function showContextMenu(e, tab) {
   const pinLabel = document.getElementById('ctx-pin-label');
   pinLabel.textContent = tab.pinned ? 'Unpin tab' : 'Pin tab';
 
+  // Hide "Close tab" for pinned tabs — unpin is the only way to remove them
+  const closeItem = tabContextMenu.querySelector('[data-action="close"]');
+  if (closeItem) closeItem.style.display = tab.pinned ? 'none' : '';
+
+  // Hide the active tab view so the context menu renders on top of the native WebContentsView
+  window.portal.hideAllTabViews();
+
   const menu = tabContextMenu;
   menu.style.left = `${e.clientX}px`;
   menu.style.top = `${e.clientY}px`;
@@ -375,6 +421,13 @@ function showContextMenu(e, tab) {
 function hideContextMenu() {
   tabContextMenu.classList.remove('open');
   contextTabId = null;
+  // Restore the active tab view
+  if (state.activeTabId) {
+    const tab = state.tabs.find(t => t.id === state.activeTabId);
+    if (tab && tab.url) {
+      window.portal.showTabView(state.activeTabId);
+    }
+  }
 }
 
 export function setupTabContextMenu() {
