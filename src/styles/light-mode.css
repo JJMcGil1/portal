@@ -79,12 +79,6 @@ body.light-mode ::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 0, 0, 0.25);
 }
 
-/* Light mode sidebar overlay */
-body.light-mode .app-body.sidebar-overlay .sidebar {
-  box-shadow: 8px 0 32px rgba(0, 0, 0, 0.1),
-              2px 0 8px rgba(0, 0, 0, 0.05);
-}
-
 /* Light mode trigger icon */
 body.light-mode .sidebar-trigger-icon {
   background: #ffffff;

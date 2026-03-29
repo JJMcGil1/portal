@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="styles/sidebar.css">
   <link rel="stylesheet" href="styles/content.css">
   <link rel="stylesheet" href="styles/components.css">
+  <link rel="stylesheet" href="styles/floating-sidebar.css">
   <link rel="stylesheet" href="styles/light-mode.css">
 </head>
 <body>
@@ -253,11 +254,14 @@
           </div>
         </div>
 
-        <!-- Webviews get injected here -->
+        <!-- Tab webviews -->
         <div id="webview-container" class="webview-container"></div>
       </div>
     </main>
     </div><!-- /.app-body -->
+
+    <!-- Floating sidebar — independent overlay panel -->
+    <div id="floating-sidebar" class="floating-sidebar"></div>
 
     <!-- Tab context menu -->
     <div class="context-menu" id="tab-context-menu">

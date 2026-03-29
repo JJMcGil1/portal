@@ -9,7 +9,7 @@ export function normalizeUrl(input) {
   }
 
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    return null;
+    return 'https://www.google.com/search?q=' + encodeURIComponent(url);
   }
 
   return url;

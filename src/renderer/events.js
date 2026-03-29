@@ -1,9 +1,9 @@
 // Event binding
 
 import { state } from './state.js';
-import { normalizeUrl, getDomain } from './utils.js';
+import { normalizeUrl } from './utils.js';
 import { urlInput, newTabBtn, saveSiteBtn, devtoolsBtn, backBtn, forwardBtn, reloadBtn, themeToggleBtn } from './dom.js';
-import { createTab, createNewTab, navigateTab, closeTab, getActiveWebview, renderTabs } from './tabs.js';
+import { createTab, createNewTab, navigateTab, closeTab, getActiveWebview } from './tabs.js';
 import { saveCurrent } from './saved.js';
 import { toggleTheme } from './theme.js';
 
@@ -17,10 +17,8 @@ export function setupEvents() {
       const activeTab = state.activeTabId ? state.tabs.find((t) => t.id === state.activeTabId) : null;
 
       if (activeTab && activeTab.url === '') {
-        // This is a "New Tab" — navigate it in place (keep tab identity)
         navigateTab(activeTab.id, url);
       } else if (activeTab) {
-        // Navigate existing tab to new URL
         navigateTab(activeTab.id, url);
       } else {
         createTab(url);
@@ -55,25 +53,34 @@ export function setupEvents() {
   saveSiteBtn.addEventListener('click', saveCurrent);
   themeToggleBtn.addEventListener('click', toggleTheme);
 
+  // Navigation — direct webview method calls
   devtoolsBtn.addEventListener('click', () => {
     const wv = getActiveWebview();
     if (wv) {
-      window.portal.toggleDevTools(wv.getWebContentsId());
+      // Use IPC to toggle devtools since webview.openDevTools() isn't directly available
+      const wcId = wv.getWebContentsId();
+      window.portal.toggleDevTools(wcId);
     }
   });
 
   backBtn.addEventListener('click', () => {
     const wv = getActiveWebview();
-    if (wv && wv.canGoBack()) wv.goBack();
+    if (wv && wv.canGoBack()) {
+      wv.goBack();
+    }
   });
 
   forwardBtn.addEventListener('click', () => {
     const wv = getActiveWebview();
-    if (wv && wv.canGoForward()) wv.goForward();
+    if (wv && wv.canGoForward()) {
+      wv.goForward();
+    }
   });
 
   reloadBtn.addEventListener('click', () => {
     const wv = getActiveWebview();
-    if (wv) wv.reload();
+    if (wv) {
+      wv.reload();
+    }
   });
 }

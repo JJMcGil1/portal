@@ -4,13 +4,142 @@ import { PiX } from 'react-icons/pi';
 import { MdOutlineTab } from 'react-icons/md';
 import { state, nextTabId } from './state.js';
 import { getDomain, getInitial, escapeHtml, escapeAttr } from './utils.js';
-import { urlInput, webviewContainer, welcome, tabsList, pinnedList, sidebarPinnedTabs, tabContextMenu } from './dom.js';
-// Note: saveCurrent is imported lazily to avoid circular deps with saved.js
+import { urlInput, welcome, tabsList, pinnedList, sidebarPinnedTabs, tabContextMenu, webviewContainer } from './dom.js';
 
 import { renderIcon } from './icon.js';
 
 // Pre-render the default tab icon SVG once
 const defaultTabIconSvg = renderIcon(MdOutlineTab, 14);
+
+// --- Webview map: tabId → <webview> element ---
+const webviews = new Map();
+
+// --- Helpers ---
+
+function getActiveWebview() {
+  if (!state.activeTabId) return null;
+  return webviews.get(state.activeTabId) || null;
+}
+
+// Expose for events.js
+export { getActiveWebview };
+
+function createWebview(tabId, url) {
+  const wv = document.createElement('webview');
+  wv.setAttribute('partition', 'persist:portal');
+  wv.setAttribute('allowpopups', '');
+  wv.classList.add('tab-webview');
+  wv.dataset.tabId = tabId;
+
+  // Initially hidden
+  wv.style.display = 'none';
+
+  // Set src
+  if (url) {
+    wv.setAttribute('src', url);
+  }
+
+  // Wire up events
+  wv.addEventListener('did-start-loading', () => {
+    const tab = state.tabs.find(t => t.id === tabId);
+    if (tab) {
+      tab.loading = true;
+      showLoadingBar(tabId);
+    }
+  });
+
+  wv.addEventListener('did-stop-loading', () => {
+    const tab = state.tabs.find(t => t.id === tabId);
+    if (tab) {
+      tab.loading = false;
+      hideLoadingBar(tabId);
+    }
+  });
+
+  wv.addEventListener('page-title-updated', (e) => {
+    const tab = state.tabs.find(t => t.id === tabId);
+    if (!tab) return;
+    tab.title = e.title || getDomain(tab.url);
+    persistUpdateTab(tabId, { title: tab.title });
+    renderTabs();
+
+    // Google auth detection: if blocked, open in system browser
+    if (e.title.toLowerCase().includes("couldn't sign you in")) {
+      const currentUrl = wv.getURL();
+      window.portal.openExternal(currentUrl);
+      wv.loadURL('about:blank');
+      wv.executeJavaScript(`
+        document.body.style.cssText = 'background:#0a0a0b;color:#fff;font-family:-apple-system,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0';
+        document.body.innerHTML = '<div style="text-align:center;max-width:400px"><h2 style="font-weight:600;margin-bottom:12px">Signing in via your browser</h2><p style="color:#888;line-height:1.6">Google requires sign-in from a standard browser. A window has been opened in your default browser.<br><br>After signing in, come back here and reload the page.</p></div>';
+      `).catch(() => {});
+    }
+  });
+
+  wv.addEventListener('page-favicon-updated', (e) => {
+    const tab = state.tabs.find(t => t.id === tabId);
+    if (!tab) return;
+    if (e.favicons && e.favicons.length > 0) {
+      tab.favicon = e.favicons[0];
+      persistUpdateTab(tabId, { favicon: tab.favicon });
+      renderTabs();
+    }
+  });
+
+  wv.addEventListener('did-navigate', (e) => {
+    const tab = state.tabs.find(t => t.id === tabId);
+    if (!tab) return;
+    tab.url = e.url;
+    persistUpdateTab(tabId, { url: tab.url });
+    if (state.activeTabId === tabId) {
+      urlInput.value = e.url;
+    }
+  });
+
+  wv.addEventListener('did-navigate-in-page', (e) => {
+    if (!e.isMainFrame) return;
+    const tab = state.tabs.find(t => t.id === tabId);
+    if (!tab) return;
+    tab.url = e.url;
+    persistUpdateTab(tabId, { url: tab.url });
+    if (state.activeTabId === tabId) {
+      urlInput.value = e.url;
+    }
+  });
+
+  // New window requests → open as new tab
+  wv.addEventListener('new-window', (e) => {
+    e.preventDefault();
+    if (e.url) {
+      createTab(e.url);
+    }
+  });
+
+  // Add to container
+  webviewContainer.appendChild(wv);
+  webviews.set(tabId, wv);
+  return wv;
+}
+
+function destroyWebview(tabId) {
+  const wv = webviews.get(tabId);
+  if (wv) {
+    wv.remove();
+    webviews.delete(tabId);
+  }
+}
+
+function showWebview(tabId) {
+  // Hide all, show the active one
+  for (const [id, wv] of webviews) {
+    wv.style.display = id === tabId ? '' : 'none';
+  }
+}
+
+function hideAllWebviews() {
+  for (const [, wv] of webviews) {
+    wv.style.display = 'none';
+  }
+}
 
 // --- Persist helpers ---
 
@@ -67,7 +196,9 @@ export function createTab(url) {
   };
   state.tabs.push(tab);
 
-  attachWebview(tab);
+  // Create webview
+  createWebview(id, url);
+
   activateTab(id);
   renderTabs();
   persistCreateTab(tab);
@@ -87,89 +218,40 @@ export function restoreTab(dbRow) {
   state.tabs.push(tab);
 
   if (tab.url) {
-    attachWebview(tab);
+    createWebview(tab.id, tab.url);
   }
 
   return tab;
 }
 
-// Navigate an existing tab to a new URL (used when navigating from "New Tab")
+// Navigate an existing tab to a new URL
 export function navigateTab(id, url) {
   const tab = state.tabs.find((t) => t.id === id);
   if (!tab) return;
 
+  const hadUrl = tab.url !== '';
   tab.url = url;
   tab.title = getDomain(url);
   tab.favicon = null;
   tab.loading = true;
 
-  // Create webview if this was a New Tab (no webview yet)
-  const existingWv = webviewContainer.querySelector(`webview[data-tab-id="${id}"]`);
-  if (existingWv) {
-    existingWv.setAttribute('src', url);
+  if (hadUrl) {
+    // Webview already exists — navigate it
+    const wv = webviews.get(id);
+    if (wv) {
+      wv.loadURL(url);
+    }
   } else {
-    attachWebview(tab);
+    // New Tab had no webview — create one
+    createWebview(id, url);
   }
 
-  // Hide welcome screen and show the webview
+  // Show the webview, hide welcome
   welcome.classList.add('hidden');
-  webviewContainer.querySelectorAll('webview').forEach((wv) => {
-    wv.classList.toggle('active', parseInt(wv.getAttribute('data-tab-id')) === id);
-  });
+  showWebview(id);
 
   persistUpdateTab(id, { url: tab.url, title: tab.title, favicon: null });
   renderTabs();
-}
-
-function attachWebview(tab) {
-  const webview = document.createElement('webview');
-  webview.setAttribute('src', tab.url);
-  webview.setAttribute('data-tab-id', tab.id);
-  webview.setAttribute('allowpopups', '');
-  webview.setAttribute('partition', 'persist:portal');
-  webviewContainer.appendChild(webview);
-
-  webview.addEventListener('did-start-loading', () => {
-    tab.loading = true;
-    showLoadingBar(tab.id);
-  });
-
-  webview.addEventListener('did-stop-loading', () => {
-    tab.loading = false;
-    hideLoadingBar(tab.id);
-  });
-
-  webview.addEventListener('page-title-updated', (e) => {
-    tab.title = e.title || getDomain(tab.url);
-    persistUpdateTab(tab.id, { title: tab.title });
-    renderTabs();
-  });
-
-  webview.addEventListener('page-favicon-updated', (e) => {
-    if (e.favicons && e.favicons.length > 0) {
-      tab.favicon = e.favicons[0];
-      persistUpdateTab(tab.id, { favicon: tab.favicon });
-      renderTabs();
-    }
-  });
-
-  webview.addEventListener('did-navigate', (e) => {
-    tab.url = e.url;
-    persistUpdateTab(tab.id, { url: tab.url });
-    if (state.activeTabId === tab.id) {
-      urlInput.value = e.url;
-    }
-  });
-
-  webview.addEventListener('did-navigate-in-page', (e) => {
-    if (e.isMainFrame) {
-      tab.url = e.url;
-      persistUpdateTab(tab.id, { url: tab.url });
-      if (state.activeTabId === tab.id) {
-        urlInput.value = e.url;
-      }
-    }
-  });
 }
 
 export function activateTab(id) {
@@ -181,12 +263,15 @@ export function activateTab(id) {
   }
 
   // Show welcome screen if this is a new tab with no URL
-  const hasWebview = tab && tab.url !== '';
-  webviewContainer.querySelectorAll('webview').forEach((wv) => {
-    wv.classList.toggle('active', parseInt(wv.getAttribute('data-tab-id')) === id);
-  });
+  const hasUrl = tab && tab.url !== '';
+  welcome.classList.toggle('hidden', hasUrl);
 
-  welcome.classList.toggle('hidden', hasWebview);
+  if (hasUrl) {
+    showWebview(id);
+  } else {
+    hideAllWebviews();
+  }
+
   persistUpdateTab(id, { isActive: true });
   renderTabs();
 }
@@ -197,8 +282,8 @@ export function closeTab(id) {
 
   state.tabs.splice(idx, 1);
 
-  const wv = webviewContainer.querySelector(`webview[data-tab-id="${id}"]`);
-  if (wv) wv.remove();
+  // Destroy the webview
+  destroyWebview(id);
 
   const bar = document.querySelector(`.loading-bar[data-tab-id="${id}"]`);
   if (bar) bar.remove();
@@ -213,17 +298,11 @@ export function closeTab(id) {
       state.activeTabId = null;
       urlInput.value = '';
       welcome.classList.remove('hidden');
+      hideAllWebviews();
     }
   }
 
   renderTabs();
-}
-
-export function getActiveWebview() {
-  if (!state.activeTabId) return null;
-  return webviewContainer.querySelector(
-    `webview[data-tab-id="${state.activeTabId}"]`
-  );
 }
 
 export function pinTab(id) {
@@ -263,7 +342,6 @@ function setupPinnedDrag(el, tab) {
     dragState = { tabId: tab.id };
     el.classList.add('pinned-dragging');
     e.dataTransfer.effectAllowed = 'move';
-    // Minimal ghost
     e.dataTransfer.setDragImage(el, el.offsetWidth / 2, el.offsetHeight / 2);
   });
 
@@ -310,17 +388,14 @@ function showContextMenu(e, tab) {
   e.preventDefault();
   contextTabId = tab.id;
 
-  // Update pin label
   const pinLabel = document.getElementById('ctx-pin-label');
   pinLabel.textContent = tab.pinned ? 'Unpin tab' : 'Pin tab';
 
-  // Position
   const menu = tabContextMenu;
   menu.style.left = `${e.clientX}px`;
   menu.style.top = `${e.clientY}px`;
   menu.classList.add('open');
 
-  // Adjust if overflowing
   requestAnimationFrame(() => {
     const rect = menu.getBoundingClientRect();
     if (rect.right > window.innerWidth) {
@@ -338,7 +413,6 @@ function hideContextMenu() {
 }
 
 export function setupTabContextMenu() {
-  // Handle menu item clicks
   tabContextMenu.addEventListener('click', (e) => {
     const item = e.target.closest('.context-menu-item');
     if (!item || contextTabId === null) return;
@@ -358,14 +432,12 @@ export function setupTabContextMenu() {
     hideContextMenu();
   });
 
-  // Close on click outside
   document.addEventListener('click', (e) => {
     if (!tabContextMenu.contains(e.target)) {
       hideContextMenu();
     }
   });
 
-  // Close on Escape
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') hideContextMenu();
   });
@@ -375,10 +447,8 @@ export function renderTabs() {
   const pinnedTabs = state.tabs.filter((t) => t.pinned);
   const unpinnedTabs = state.tabs.filter((t) => !t.pinned);
 
-  // Toggle pinned section visibility
   sidebarPinnedTabs.style.display = pinnedTabs.length > 0 ? '' : 'none';
 
-  // Render pinned tabs
   pinnedList.innerHTML = '';
   pinnedTabs.forEach((tab) => {
     const el = document.createElement('div');
@@ -396,7 +466,6 @@ export function renderTabs() {
     pinnedList.appendChild(el);
   });
 
-  // Render unpinned tabs
   tabsList.innerHTML = '';
 
   unpinnedTabs.forEach((tab) => {

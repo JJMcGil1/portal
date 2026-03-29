@@ -1,90 +1,48 @@
-// Sidebar collapse / overlay logic
+// Sidebar collapse / pin logic
+// Overlay behavior is handled entirely by floating-sidebar.js
 import { VscLayoutSidebarLeft, VscLayoutSidebarLeftOff } from 'react-icons/vsc';
 import { appBody, sidebarCollapseBtn, sidebarTrigger, sidebar } from './dom.js';
 import { renderIcon } from './icon.js';
+import { hideFloatingSidebar, isFloatingVisible } from './floating-sidebar.js';
 
-let sidebarState = 'pinned';
-let leaveTimer = null;
+let sidebarState = 'pinned'; // pinned | collapsed
 
 function setState(next) {
-  const prev = sidebarState;
+  if (sidebarState === next) return;
   sidebarState = next;
-  appBody.classList.remove('sidebar-collapsed', 'sidebar-overlay');
 
-  if (next === 'collapsed') {
+  if (next === 'pinned') {
+    hideFloatingSidebar();
+    appBody.classList.remove('sidebar-collapsed');
+    sidebarCollapseBtn.innerHTML = renderIcon(VscLayoutSidebarLeft);
+  } else {
     appBody.classList.add('sidebar-collapsed');
     sidebarCollapseBtn.innerHTML = renderIcon(VscLayoutSidebarLeftOff);
-  } else if (next === 'overlay') {
-    appBody.classList.add('sidebar-overlay');
-    sidebarCollapseBtn.innerHTML = renderIcon(VscLayoutSidebarLeftOff);
-  } else {
-    // Pinning from overlay — transition from absolute to flow
-    if (prev === 'overlay') {
-      sidebar.style.position = 'absolute';
-      requestAnimationFrame(() => {
-        sidebar.style.position = '';
-      });
-    }
-    sidebarCollapseBtn.innerHTML = renderIcon(VscLayoutSidebarLeft);
   }
 }
 
+export function getSidebarState() {
+  return sidebarState;
+}
+
 export function setupSidebar() {
+  // Toggle button: pin / collapse
   sidebarCollapseBtn.addEventListener('click', () => {
     if (sidebarState === 'pinned') {
       setState('collapsed');
     } else {
-      clearTimeout(leaveTimer);
       setState('pinned');
     }
   });
 
+  // Clicking the trigger re-pins
   sidebarTrigger.addEventListener('click', () => {
-    if (sidebarState === 'collapsed' || sidebarState === 'overlay') {
-      clearTimeout(leaveTimer);
+    if (sidebarState === 'collapsed') {
       setState('pinned');
     }
   });
 
-  sidebarTrigger.addEventListener('mouseenter', () => {
-    clearTimeout(leaveTimer);
-    if (sidebarState === 'collapsed') {
-      setState('overlay');
-    }
-  });
-
-  sidebar.addEventListener('mouseenter', () => {
-    if (sidebarState === 'overlay') {
-      clearTimeout(leaveTimer);
-    }
-  });
-
-  sidebar.addEventListener('mouseleave', (e) => {
-    if (sidebarState === 'overlay') {
-      const triggerRect = sidebarTrigger.getBoundingClientRect();
-      if (e.clientX >= triggerRect.left && e.clientX <= triggerRect.right &&
-          e.clientY >= triggerRect.top && e.clientY <= triggerRect.bottom) {
-        return;
-      }
-      leaveTimer = setTimeout(() => {
-        if (sidebarState === 'overlay') setState('collapsed');
-      }, 300);
-    }
-  });
-
-  sidebarTrigger.addEventListener('mouseleave', (e) => {
-    if (sidebarState === 'overlay') {
-      const rect = sidebar.getBoundingClientRect();
-      if (e.clientX >= rect.left && e.clientX <= rect.right &&
-          e.clientY >= rect.top && e.clientY <= rect.bottom) {
-        return;
-      }
-      leaveTimer = setTimeout(() => {
-        if (sidebarState === 'overlay') setState('collapsed');
-      }, 300);
-    }
-  });
-
+  // Keyboard shortcut: Cmd+\
   document.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === '\\') {
       e.preventDefault();

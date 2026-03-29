@@ -47,7 +47,7 @@
 .sidebar-trigger-icon {
   position: absolute;
   top: 50%;
-  left: 8px;
+  left: 4px;
   transform: translateY(-50%) scale(0.8);
   width: 32px;
   height: 32px;
@@ -76,6 +76,7 @@
 }
 
 /* ── Collapsed state ── */
+/* When collapsed, the in-flow sidebar is width:0. Content fills the space. */
 
 .app-body.sidebar-collapsed .sidebar {
   width: 0;
@@ -94,34 +95,10 @@
 
 .app-body.sidebar-collapsed .sidebar-trigger {
   display: block;
-  width: 40px;
+  width: 12px;
 }
 
-/* ── Overlay state (hovering while collapsed) ── */
-
-.app-body.sidebar-overlay .sidebar {
-  width: var(--sidebar-width);
-  min-width: var(--sidebar-width);
-  opacity: 1;
-  pointer-events: auto;
-  position: fixed;
-  top: 0;
-  left: 0;
-  bottom: 0;
-  padding-top: 38px; /* clear titlebar / traffic lights */
-  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4),
-              1px 0 4px rgba(0, 0, 0, 0.2);
-  border-right: 1px solid var(--border-subtle);
-  z-index: 200; /* above titlebar */
-}
-
-.app-body.sidebar-overlay .sidebar .sidebar-inner {
-  opacity: 1;
-}
-
-.app-body.sidebar-overlay .sidebar-trigger {
-  display: none;
-}
+/* Overlay/floating state handled by floating-sidebar.css */
 
 /* ── Header: logo ── */
 

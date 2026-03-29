@@ -1,6 +1,12 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('portal', {
+  // Open URL in system browser (for Google auth fallback)
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
+
+  // DevTools
+  toggleDevTools: (webContentsId) => ipcRenderer.send('toggle-devtools', webContentsId),
+
   // Tab persistence
   getAllTabs: () => ipcRenderer.invoke('db-get-all-tabs'),
   getActiveTabId: () => ipcRenderer.invoke('db-get-active-tab-id'),
@@ -24,7 +30,4 @@ contextBridge.exposeInMainWorld('portal', {
   // Legacy
   loadData: () => ipcRenderer.invoke('load-data'),
   saveData: (data) => ipcRenderer.invoke('save-data', data),
-
-  // DevTools
-  toggleDevTools: (webContentsId) => ipcRenderer.send('toggle-devtools', webContentsId),
 });

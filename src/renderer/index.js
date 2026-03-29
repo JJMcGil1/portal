@@ -18,6 +18,7 @@ import { renderSaved } from './saved.js';
 import { restoreTab, activateTab, renderTabs, createTab, createNewTab, navigateTab, setupTabContextMenu } from './tabs.js';
 import { setupEvents } from './events.js';
 import { setupSidebar } from './sidebar.js';
+import { setupFloatingSidebar } from './floating-sidebar.js';
 import { setupAccount } from './account.js';
 import { loadTheme } from './theme.js';
 import { normalizeUrl } from './utils.js';
@@ -118,6 +119,7 @@ async function init() {
   renderTabs();
   setupEvents();
   setupSidebar();
+  setupFloatingSidebar();
   setupTabContextMenu();
   await setupAccount();
 }

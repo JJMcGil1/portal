@@ -181,26 +181,19 @@
   color: var(--text-secondary);
 }
 
-/* Webview Container */
-
+/* Webview container */
 .webview-container {
   position: absolute;
   inset: 0;
-  border-radius: var(--radius-lg);
-  overflow: hidden;
+  z-index: 0;
 }
 
-.webview-container webview {
-  position: absolute;
-  inset: 0;
+.webview-container webview,
+.webview-container .tab-webview {
   width: 100%;
   height: 100%;
-  display: none;
+  border: none;
   border-radius: var(--radius-lg);
-}
-
-.webview-container webview.active {
-  display: flex;
 }
 
 /* Loading Bar */

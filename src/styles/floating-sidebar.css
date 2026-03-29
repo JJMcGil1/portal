@@ -1,0 +1,64 @@
+/* ============================================
+   Floating Sidebar — Independent overlay panel
+   Completely decoupled from main sidebar layout.
+   ============================================ */
+
+.floating-sidebar {
+  position: fixed;
+  top: 46px;         /* below titlebar + 8px gap */
+  left: 8px;
+  bottom: 8px;
+  width: var(--sidebar-width);
+  z-index: 300;
+
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 8px 40px rgba(0, 0, 0, 0.5),
+    0 2px 8px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+
+  /* Animation */
+  opacity: 0;
+  transform: translateX(-8px) scale(0.98);
+  pointer-events: none;
+  transition:
+    opacity 220ms var(--ease-out),
+    transform 220ms var(--ease-out);
+}
+
+.floating-sidebar.visible {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+  pointer-events: auto;
+}
+
+.floating-sidebar.closing {
+  opacity: 0;
+  transform: translateX(-8px) scale(0.98);
+  pointer-events: none;
+}
+
+/* Inner content — fills the rounded panel */
+.floating-sidebar .sidebar-inner {
+  width: 100%;
+  min-width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  opacity: 1;
+}
+
+/* ── Light mode ── */
+[data-theme="light"] .floating-sidebar {
+  box-shadow:
+    0 8px 40px rgba(0, 0, 0, 0.15),
+    0 2px 8px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  border-color: var(--border-medium);
+}

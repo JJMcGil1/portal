@@ -1,14 +1,23 @@
-const { app, BrowserWindow, ipcMain, session, nativeTheme, nativeImage } = require('electron');
+// Suppress Electron security warnings before anything else
+process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true';
+
+const { app, BrowserWindow, ipcMain, session, nativeTheme, nativeImage, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const database = require('./database.js');
 
-// Force dark mode at the Chromium level so webviews report prefers-color-scheme: dark
+// Force dark mode at the Chromium level
 app.commandLine.appendSwitch('force-dark-mode');
+
+// Strip "Electron" from the default user agent globally
+const defaultUA = app.userAgentFallback;
+app.userAgentFallback = defaultUA
+  .replace(/\s*Electron\/[\d.]+/, '')
+  .replace(/\s*portal\/[\d.]+/, '');
 
 let mainWindow;
 
-// --- Live Reload: watch src/ and reload renderer on file changes ---
+// --- Live Reload ---
 const isDev = !app.isPackaged;
 
 function setupLiveReload(win) {
@@ -20,24 +29,20 @@ function setupLiveReload(win) {
   fs.watch(srcDir, { recursive: true }, (eventType, filename) => {
     if (!filename || filename.startsWith('.')) return;
 
-    // Debounce — ignore rapid duplicate events (fs.watch fires multiples)
     if (debounce[filename]) return;
     debounce[filename] = true;
     setTimeout(() => { delete debounce[filename]; }, 300);
 
     const ext = path.extname(filename).toLowerCase();
 
-    // Main process file changed — need full restart
     if (filename === 'main.js' || filename === 'preload.js' || filename.endsWith('preload.js')) {
       console.log(`[live-reload] Main process file changed: ${filename} — restart the app`);
       return;
     }
 
-    // Renderer files — hot reload
     if (['.html', '.css', '.js'].includes(ext)) {
       console.log(`[live-reload] ${filename} changed — reloading renderer`);
       if (ext === '.css') {
-        // CSS-only: inject without full page reload (preserves state)
         win.webContents.executeJavaScript(`
           document.querySelectorAll('link[rel="stylesheet"]').forEach(link => {
             const href = link.href.split('?')[0];
@@ -64,14 +69,87 @@ async function generateAppIcon() {
   });
 
   await iconWindow.loadFile(path.join(__dirname, 'icons', 'app-icon.html'));
-
-  // Small delay to ensure SVG gradients are fully rendered
   await new Promise(resolve => setTimeout(resolve, 150));
-
   const image = await iconWindow.webContents.capturePage();
   iconWindow.destroy();
   return image;
 }
+
+// --- Chrome spoofing ---
+const chromeVersion = process.versions.chrome;
+const chromeMajor = chromeVersion.split('.')[0];
+
+const CHROME_SPOOF_SCRIPT = `
+  if (navigator.userAgentData) {
+    const brands = [
+      { brand: "Chromium", version: "${chromeMajor}" },
+      { brand: "Google Chrome", version: "${chromeMajor}" },
+      { brand: "Not-A.Brand", version: "99" }
+    ];
+    Object.defineProperty(navigator, 'userAgentData', {
+      value: Object.create(NavigatorUAData.prototype, {
+        brands: { get: () => brands, enumerable: true },
+        mobile: { get: () => false, enumerable: true },
+        platform: { get: () => "macOS", enumerable: true },
+        toJSON: { value: function() { return { brands, mobile: false, platform: "macOS" }; } },
+        getHighEntropyValues: {
+          value: function(hints) {
+            return Promise.resolve({
+              brands,
+              mobile: false,
+              platform: "macOS",
+              platformVersion: "15.0.0",
+              architecture: "arm",
+              model: "",
+              uaFullVersion: "${chromeVersion}",
+              fullVersionList: [
+                { brand: "Chromium", version: "${chromeVersion}" },
+                { brand: "Google Chrome", version: "${chromeVersion}" },
+                { brand: "Not-A.Brand", version: "99.0.0.0" }
+              ]
+            });
+          }
+        }
+      }),
+      configurable: false
+    });
+  }
+  if (!window.chrome) window.chrome = {};
+  if (!window.chrome.runtime) {
+    window.chrome.runtime = {
+      connect: function() { return { onMessage: { addListener: function(){} }, postMessage: function(){} }; },
+      sendMessage: function() {},
+      onMessage: { addListener: function(){}, removeListener: function(){} },
+      onConnect: { addListener: function(){}, removeListener: function(){} },
+      id: undefined
+    };
+  }
+  if (!window.chrome.loadTimes) {
+    window.chrome.loadTimes = function() {
+      return { commitLoadTime: Date.now()/1000, connectionInfo: "h2", finishDocumentLoadTime: Date.now()/1000,
+        finishLoadTime: Date.now()/1000, firstPaintAfterLoadTime: 0, firstPaintTime: Date.now()/1000,
+        navigationType: "Other", npnNegotiatedProtocol: "h2", requestTime: Date.now()/1000,
+        startLoadTime: Date.now()/1000, wasAlternateProtocolAvailable: false, wasFetchedViaSpdy: true, wasNpnNegotiated: true };
+    };
+  }
+  if (!window.chrome.csi) {
+    window.chrome.csi = function() { return { startE: Date.now(), onloadT: Date.now(), pageT: Date.now(), tran: 15 }; };
+  }
+  Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+  Object.defineProperty(navigator, 'plugins', {
+    get: () => [
+      { name: "PDF Viewer", filename: "internal-pdf-viewer", description: "Portable Document Format" },
+      { name: "Chrome PDF Viewer", filename: "internal-pdf-viewer", description: "" },
+      { name: "Chromium PDF Viewer", filename: "internal-pdf-viewer", description: "" },
+      { name: "Microsoft Edge PDF Viewer", filename: "internal-pdf-viewer", description: "" },
+      { name: "WebKit built-in PDF", filename: "internal-pdf-viewer", description: "" }
+    ]
+  });
+  Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+  if (typeof process !== 'undefined' && process.versions && process.versions.electron) {
+    try { delete window.process; } catch(e) {}
+  }
+`;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -84,15 +162,15 @@ function createWindow() {
     backgroundColor: '#0a0a0b',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      webviewTag: true,
       nodeIntegration: false,
       contextIsolation: true,
+      webviewTag: true,
     },
   });
 
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
 
-  // Set app icon (dock on macOS, taskbar on Windows/Linux)
+  // Set app icon
   generateAppIcon().then(icon => {
     if (process.platform === 'darwin' && app.dock) {
       app.dock.setIcon(icon);
@@ -102,46 +180,74 @@ function createWindow() {
 
   setupLiveReload(mainWindow);
 
-  // Configure webview guest processes
+  // Inject Chrome spoofing into every webview
   mainWindow.webContents.on('did-attach-webview', (event, webContents) => {
-    webContents.setWindowOpenHandler(({ url }) => {
-      return { action: 'allow' };
+    // Set user agent
+    webContents.setUserAgent(
+      `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`
+    );
+
+    // Inject spoofing before page scripts run
+    webContents.on('did-start-navigation', (e, navUrl, isInPlace, isMainFrame) => {
+      if (isMainFrame) {
+        webContents.executeJavaScript(CHROME_SPOOF_SCRIPT).catch(() => {});
+      }
     });
 
-    // Force dark color scheme via CDP. Webview guests are separate Chromium
-    // processes — nativeTheme and force-dark-mode flags don't reach them.
-    // Attach debugger once per webview, send on every navigation.
-    function emitDarkScheme() {
-      try {
-        if (!webContents.debugger.isAttached()) {
-          webContents.debugger.attach('1.3');
+    // Dark mode injection
+    const darkModeCSS = `
+      @media (prefers-color-scheme: light) {
+        :root { color-scheme: dark !important; }
+      }
+    `;
+    function injectDarkMode() {
+      webContents.insertCSS(darkModeCSS).catch(() => {});
+      webContents.executeJavaScript(`
+        if (!document.querySelector('meta[name="color-scheme"][data-portal]')) {
+          const meta = document.createElement('meta');
+          meta.name = 'color-scheme';
+          meta.content = 'dark';
+          meta.dataset.portal = '1';
+          document.head.appendChild(meta);
         }
-        webContents.debugger.sendCommand('Emulation.setEmulatedMedia', {
-          features: [{ name: 'prefers-color-scheme', value: 'dark' }],
-        }).catch(() => {});
-      } catch {}
+      `).catch(() => {});
     }
-
-    webContents.on('did-finish-load', emitDarkScheme);
-    webContents.on('did-navigate', emitDarkScheme);
-    webContents.on('did-navigate-in-page', emitDarkScheme);
-
-    webContents.on('destroyed', () => {
-      try { if (webContents.debugger.isAttached()) webContents.debugger.detach(); } catch {}
-    });
+    webContents.on('did-finish-load', injectDarkMode);
+    webContents.on('did-navigate', injectDarkMode);
   });
 }
 
 app.whenReady().then(() => {
   nativeTheme.themeSource = 'dark';
 
-  // Configure the persist:portal partition used by all webviews
+  // Configure the persist:portal partition
   const webviewSession = session.fromPartition('persist:portal');
 
-  // Strip restrictive CSP headers so sites load properly inside webviews
+  const cleanUA = `"Chromium";v="${chromeMajor}", "Google Chrome";v="${chromeMajor}", "Not-A.Brand";v="99"`;
+  const cleanUAFull = `"Chromium";v="${chromeVersion}", "Google Chrome";v="${chromeVersion}", "Not-A.Brand";v="99.0.0.0"`;
+
+  // Rewrite headers to remove Electron fingerprint
+  webviewSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    const headers = { ...details.requestHeaders };
+    if (headers['Sec-CH-UA'] || headers['sec-ch-ua']) {
+      headers['Sec-CH-UA'] = cleanUA;
+      delete headers['sec-ch-ua'];
+    }
+    if (headers['Sec-CH-UA-Full-Version-List'] || headers['sec-ch-ua-full-version-list']) {
+      headers['Sec-CH-UA-Full-Version-List'] = cleanUAFull;
+      delete headers['sec-ch-ua-full-version-list'];
+    }
+    if (headers['User-Agent']) {
+      headers['User-Agent'] = headers['User-Agent']
+        .replace(/\s*Electron\/[\d.]+/, '')
+        .replace(/\s*portal\/[\d.]+/, '');
+    }
+    callback({ requestHeaders: headers });
+  });
+
+  // Strip restrictive CSP headers
   webviewSession.webRequest.onHeadersReceived((details, callback) => {
     const headers = { ...details.responseHeaders };
-    // Remove CSP and X-Frame-Options that block embedding
     delete headers['content-security-policy'];
     delete headers['Content-Security-Policy'];
     delete headers['x-frame-options'];
@@ -149,16 +255,14 @@ app.whenReady().then(() => {
     callback({ responseHeaders: headers });
   });
 
-  // Allow all permission requests (notifications, geolocation, camera, etc.)
+  // Allow all permissions
   webviewSession.setPermissionRequestHandler((webContents, permission, callback) => {
     callback(true);
   });
 
-  // Enable third-party cookies for OAuth flows (Google, GitHub, etc.)
   webviewSession.cookies.flushStore().catch(() => {});
 
-  // Set a standard browser user-agent so sites don't block us
-  const chromeVersion = process.versions.chrome;
+  // Set standard user agent
   webviewSession.setUserAgent(
     `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`
   );
@@ -175,12 +279,18 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
-  // Flush cookies to disk before quitting so logins persist
   session.fromPartition('persist:portal').cookies.flushStore().catch(() => {});
   database.close();
 });
 
-// IPC handlers — SQLite persistence
+// --- IPC ---
+
+// Open URL in system browser (for Google auth fallback)
+ipcMain.handle('open-external', (_, url) => {
+  shell.openExternal(url);
+});
+
+// --- IPC: SQLite persistence ---
 ipcMain.handle('db-get-all-tabs', () => database.getAllTabs());
 ipcMain.handle('db-get-active-tab-id', () => database.getActiveTabId());
 ipcMain.handle('db-create-tab', (_, tab) => database.createTab(tab));
@@ -193,7 +303,7 @@ ipcMain.handle('db-delete-saved', (_, id) => database.deleteSaved(id));
 ipcMain.handle('db-get-profile', () => database.getProfile());
 ipcMain.handle('db-update-profile', (_, fields) => database.updateProfile(fields));
 ipcMain.handle('db-reorder-pinned-tabs', (_, orderedIds) => database.reorderPinnedTabs(orderedIds));
-// Legacy — keep for backward compat during transition
+// Legacy
 ipcMain.handle('load-data', () => ({ sites: database.getAllSaved() }));
 ipcMain.handle('save-data', () => {});
 
