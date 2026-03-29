@@ -34,7 +34,7 @@
           "target": "zip",
           "arch": ["x64", "arm64"]
         }
-      ],
+      ]
     },
     "dmg": {
       "contents": [
