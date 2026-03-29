@@ -7,6 +7,7 @@ let sidebarState = 'pinned';
 let leaveTimer = null;
 
 function setState(next) {
+  const prev = sidebarState;
   sidebarState = next;
   appBody.classList.remove('sidebar-collapsed', 'sidebar-overlay');
 
@@ -17,6 +18,13 @@ function setState(next) {
     appBody.classList.add('sidebar-overlay');
     sidebarCollapseBtn.innerHTML = renderIcon(VscLayoutSidebarLeftOff);
   } else {
+    // Pinning from overlay — transition from absolute to flow
+    if (prev === 'overlay') {
+      sidebar.style.position = 'absolute';
+      requestAnimationFrame(() => {
+        sidebar.style.position = '';
+      });
+    }
     sidebarCollapseBtn.innerHTML = renderIcon(VscLayoutSidebarLeft);
   }
 }

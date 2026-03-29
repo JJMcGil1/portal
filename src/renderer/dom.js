@@ -17,3 +17,7 @@ export const sidebarTrigger = document.getElementById('sidebar-trigger');
 export const appEl = document.getElementById('app');
 export const appBody = document.querySelector('.app-body');
 export const sidebar = document.getElementById('sidebar');
+export const pinnedList = document.getElementById('pinned-list');
+export const sidebarPinnedTabs = document.getElementById('sidebar-pinned-tabs');
+export const tabContextMenu = document.getElementById('tab-context-menu');
+export const welcomeSearchInput = document.getElementById('welcome-search-input');

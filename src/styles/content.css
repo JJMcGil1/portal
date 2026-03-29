@@ -8,7 +8,7 @@
   background: var(--bg-secondary);
   overflow: hidden;
   display: flex;
-  padding: 2px var(--space-2) var(--space-2);
+  padding: 2px var(--space-2) var(--space-2) 0;
 }
 
 .content-frame {
@@ -41,7 +41,7 @@
 
 .welcome-inner {
   text-align: center;
-  max-width: 480px;
+  max-width: 560px;
   width: 100%;
   padding: 0 var(--space-6);
 }
@@ -53,30 +53,92 @@
   letter-spacing: -0.02em;
   color: var(--text-primary);
   opacity: 0.85;
-  margin-bottom: var(--space-1);
+  margin-bottom: var(--space-5);
 }
 
-.welcome-subtitle {
-  font-size: var(--text-base);
+/* Welcome Search Bar */
+.welcome-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 0 0 var(--space-6);
+  background: var(--bg-hover);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-lg);
+  padding: 0 var(--space-4);
+  height: 52px;
+  transition: border-color var(--duration-fast) var(--ease-out),
+              box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.welcome-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-glow),
+              0 4px 24px rgba(0, 0, 0, 0.2);
+}
+
+.welcome-search-icon {
+  flex-shrink: 0;
   color: var(--text-tertiary);
-  opacity: 0.5;
-  margin-bottom: var(--space-8);
+  display: flex;
+  align-items: center;
+  margin-right: var(--space-3);
 }
 
-/* Quick-access shortcut grid */
+.welcome-search-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  font-family: var(--font-sans);
+  font-size: var(--text-lg);
+  color: var(--text-primary);
+  padding: 0;
+  height: 100%;
+}
+
+.welcome-search-input::placeholder {
+  color: var(--text-tertiary);
+  opacity: 0.6;
+}
+
+.welcome-search-kbd {
+  flex-shrink: 0;
+  margin-left: var(--space-3);
+  opacity: 0.3;
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.welcome-search:focus-within .welcome-search-kbd {
+  opacity: 0;
+}
+
+.welcome-search-kbd kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  border: 1px solid var(--border-medium);
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  color: var(--text-tertiary);
+}
+
+/* Quick-access shortcut row */
 .welcome-shortcuts {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-3);
-  margin-bottom: var(--space-8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
 }
 
 .shortcut-tile {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-4) var(--space-2);
+  justify-content: center;
+  width: 40px;
+  height: 40px;
   border-radius: var(--radius-md);
   background: var(--bg-hover);
   cursor: pointer;
@@ -88,37 +150,17 @@
 
 .shortcut-tile:hover {
   background: var(--bg-active);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
 
 .shortcut-tile:active {
   transform: translateY(0);
 }
 
-.shortcut-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-tertiary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.shortcut-icon img {
-  width: 20px;
-  height: 20px;
+.shortcut-tile img {
+  width: 18px;
+  height: 18px;
   object-fit: contain;
-}
-
-.shortcut-label {
-  font-size: var(--text-xs);
-  color: var(--text-secondary);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
 }
 
 /* Keyboard hint */

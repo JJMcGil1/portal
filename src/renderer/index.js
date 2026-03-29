@@ -2,27 +2,31 @@
 import {
   PiMagnifyingGlass,
   PiBookmarkSimple,
-  PiPlus,
   PiCaretLeft,
   PiCaretRight,
   PiArrowClockwise,
   PiCode,
   PiSun,
   PiMoon,
+  PiPlus,
 } from 'react-icons/pi';
 import { VscLayoutSidebarLeft, VscLayoutSidebarLeftOff } from 'react-icons/vsc';
+import { MdOutlineTab } from 'react-icons/md';
 import { renderIcon } from './icon.js';
 import { state, setTabIdCounter } from './state.js';
 import { renderSaved } from './saved.js';
-import { restoreTab, activateTab, renderTabs, createTab, navigateTab } from './tabs.js';
+import { restoreTab, activateTab, renderTabs, createTab, createNewTab, navigateTab, setupTabContextMenu } from './tabs.js';
 import { setupEvents } from './events.js';
 import { setupSidebar } from './sidebar.js';
+import { setupAccount } from './account.js';
 import { loadTheme } from './theme.js';
+import { normalizeUrl } from './utils.js';
 
 function initStaticIcons() {
   // Titlebar icons
   document.getElementById('sidebar-collapse-btn').innerHTML = renderIcon(VscLayoutSidebarLeft);
   document.querySelector('.url-input-icon').innerHTML = renderIcon(PiMagnifyingGlass, 13);
+  document.querySelector('.welcome-search-icon').innerHTML = renderIcon(PiMagnifyingGlass, 18);
   document.getElementById('back-btn').innerHTML = renderIcon(PiCaretLeft);
   document.getElementById('forward-btn').innerHTML = renderIcon(PiCaretRight);
   document.getElementById('reload-btn').innerHTML = renderIcon(PiArrowClockwise, 14);
@@ -46,6 +50,25 @@ function initWelcome() {
   else if (hour >= 12 && hour < 17) greeting = 'Good afternoon';
   const el = document.getElementById('welcome-greeting');
   if (el) el.textContent = greeting;
+
+  // Welcome search input — navigate on Enter
+  const welcomeSearchInput = document.getElementById('welcome-search-input');
+  if (welcomeSearchInput) {
+    welcomeSearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const url = normalizeUrl(welcomeSearchInput.value);
+        if (!url) return;
+        const activeTab = state.activeTabId ? state.tabs.find((t) => t.id === state.activeTabId) : null;
+        if (activeTab && activeTab.url === '') {
+          navigateTab(activeTab.id, url);
+        } else {
+          createTab(url);
+        }
+        welcomeSearchInput.value = '';
+        welcomeSearchInput.blur();
+      }
+    });
+  }
 
   // Shortcut tile clicks → navigate active new tab, or create one
   document.querySelectorAll('.shortcut-tile[data-url]').forEach((tile) => {
@@ -95,6 +118,8 @@ async function init() {
   renderTabs();
   setupEvents();
   setupSidebar();
+  setupTabContextMenu();
+  await setupAccount();
 }
 
 loadTheme();

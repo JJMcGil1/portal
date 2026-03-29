@@ -118,24 +118,86 @@
 
       <!-- Sidebar -->
       <aside id="sidebar" class="sidebar">
-        <!-- Pinned / Saved Sites -->
-        <div class="sidebar-pinned">
-          <div class="section-label">
-            <span>Saved</span>
-            <button class="icon-btn" id="save-site-btn" title="Save current site"></button>
+        <div class="sidebar-inner">
+          <!-- Pinned Tabs -->
+          <div class="sidebar-pinned-tabs" id="sidebar-pinned-tabs">
+            <div id="pinned-list" class="pinned-list"></div>
           </div>
-          <div id="saved-list" class="saved-list"></div>
-        </div>
 
-        <!-- Tabs — main scrollable area -->
-        <div class="sidebar-tabs">
-          <div class="section-label">
-            <span>Tabs</span>
-            <button class="icon-btn" id="new-tab-btn" title="New tab"></button>
+          <!-- Saved Sites -->
+          <div class="sidebar-saved">
+            <div class="section-label">
+              <span>Saved</span>
+              <button class="icon-btn" id="save-site-btn" title="Save current site"></button>
+            </div>
+            <div id="saved-list" class="saved-list"></div>
           </div>
-          <div id="tabs-list" class="tabs-list"></div>
+
+          <!-- Tabs — main scrollable area -->
+          <div class="sidebar-tabs">
+            <div class="section-label">
+              <span>Tabs</span>
+              <button class="icon-btn" id="new-tab-btn" title="New tab"></button>
+            </div>
+            <div id="tabs-list" class="tabs-list"></div>
+          </div>
+
+          <!-- Account tile — bottom of sidebar -->
+          <div class="sidebar-footer">
+            <button class="account-tile" id="account-tile">
+              <div class="account-avatar" id="account-avatar">
+                <span class="account-avatar-initials" id="account-initials"></span>
+                <img class="account-avatar-photo" id="account-photo" alt="" />
+              </div>
+              <div class="account-info">
+                <span class="account-name" id="account-name">Set up profile</span>
+                <span class="account-email" id="account-email"></span>
+              </div>
+            </button>
+          </div>
         </div>
       </aside>
+
+      <!-- Account settings modal -->
+      <div class="modal-overlay" id="account-modal">
+        <div class="modal" id="account-modal-inner">
+          <div class="modal-header">
+            <h2 class="modal-title">Profile</h2>
+            <button class="icon-btn modal-close" id="account-modal-close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="profile-photo-section">
+              <div class="profile-photo-preview" id="profile-photo-preview">
+                <span class="profile-photo-initials" id="profile-photo-initials"></span>
+                <img class="profile-photo-img" id="profile-photo-img" alt="" />
+              </div>
+              <div class="profile-photo-actions">
+                <button class="btn btn-secondary" id="profile-photo-upload">Upload photo</button>
+                <button class="btn btn-ghost" id="profile-photo-remove">Remove</button>
+                <input type="file" id="profile-photo-input" accept="image/*" hidden />
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-field">
+                <label class="form-label" for="profile-first-name">First name</label>
+                <input class="form-input" type="text" id="profile-first-name" placeholder="First name" spellcheck="false" autocomplete="off" />
+              </div>
+              <div class="form-field">
+                <label class="form-label" for="profile-last-name">Last name</label>
+                <input class="form-input" type="text" id="profile-last-name" placeholder="Last name" spellcheck="false" autocomplete="off" />
+              </div>
+            </div>
+            <div class="form-field">
+              <label class="form-label" for="profile-email">Email</label>
+              <input class="form-input" type="email" id="profile-email" placeholder="you@example.com" spellcheck="false" autocomplete="off" />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" id="account-modal-cancel">Cancel</button>
+            <button class="btn btn-primary" id="account-modal-save">Save</button>
+          </div>
+        </div>
+      </div>
 
       <!-- Content Area -->
       <main id="content" class="content">
@@ -144,61 +206,49 @@
         <div id="welcome" class="welcome">
           <div class="welcome-inner">
             <h1 class="welcome-greeting" id="welcome-greeting"></h1>
-            <p class="welcome-subtitle">Where would you like to go?</p>
 
             <div class="welcome-shortcuts" id="welcome-shortcuts">
-              <a class="shortcut-tile" data-url="https://google.com">
-                <div class="shortcut-icon">
-                  <img src="https://www.google.com/favicon.ico" alt="" width="20" height="20" />
-                </div>
-                <span class="shortcut-label">Google</span>
+              <a class="shortcut-tile" data-url="https://google.com" title="Google">
+                <img src="https://www.google.com/favicon.ico" alt="Google" width="20" height="20" />
               </a>
-              <a class="shortcut-tile" data-url="https://youtube.com">
-                <div class="shortcut-icon">
-                  <img src="https://www.youtube.com/favicon.ico" alt="" width="20" height="20" />
-                </div>
-                <span class="shortcut-label">YouTube</span>
+              <a class="shortcut-tile" data-url="https://youtube.com" title="YouTube">
+                <img src="https://www.youtube.com/favicon.ico" alt="YouTube" width="20" height="20" />
               </a>
-              <a class="shortcut-tile" data-url="https://github.com">
-                <div class="shortcut-icon">
-                  <img src="https://github.com/favicon.ico" alt="" width="20" height="20" />
-                </div>
-                <span class="shortcut-label">GitHub</span>
+              <a class="shortcut-tile" data-url="https://github.com" title="GitHub">
+                <img src="https://github.com/favicon.ico" alt="GitHub" width="20" height="20" />
               </a>
-              <a class="shortcut-tile" data-url="https://twitter.com">
-                <div class="shortcut-icon">
-                  <img src="https://abs.twimg.com/favicons/twitter.3.ico" alt="" width="20" height="20" />
-                </div>
-                <span class="shortcut-label">X</span>
+              <a class="shortcut-tile" data-url="https://twitter.com" title="X">
+                <img src="https://abs.twimg.com/favicons/twitter.3.ico" alt="X" width="20" height="20" />
               </a>
-              <a class="shortcut-tile" data-url="https://reddit.com">
-                <div class="shortcut-icon">
-                  <img src="https://www.reddit.com/favicon.ico" alt="" width="20" height="20" />
-                </div>
-                <span class="shortcut-label">Reddit</span>
+              <a class="shortcut-tile" data-url="https://reddit.com" title="Reddit">
+                <img src="https://www.reddit.com/favicon.ico" alt="Reddit" width="20" height="20" />
               </a>
-              <a class="shortcut-tile" data-url="https://notion.so">
-                <div class="shortcut-icon">
-                  <img src="https://www.notion.so/favicon.ico" alt="" width="20" height="20" />
-                </div>
-                <span class="shortcut-label">Notion</span>
+              <a class="shortcut-tile" data-url="https://notion.so" title="Notion">
+                <img src="https://www.notion.so/favicon.ico" alt="Notion" width="20" height="20" />
               </a>
-              <a class="shortcut-tile" data-url="https://linkedin.com">
-                <div class="shortcut-icon">
-                  <img src="https://www.linkedin.com/favicon.ico" alt="" width="20" height="20" />
-                </div>
-                <span class="shortcut-label">LinkedIn</span>
+              <a class="shortcut-tile" data-url="https://linkedin.com" title="LinkedIn">
+                <img src="https://www.linkedin.com/favicon.ico" alt="LinkedIn" width="20" height="20" />
               </a>
-              <a class="shortcut-tile" data-url="https://gmail.com">
-                <div class="shortcut-icon">
-                  <img src="https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico" alt="" width="20" height="20" />
-                </div>
-                <span class="shortcut-label">Gmail</span>
+              <a class="shortcut-tile" data-url="https://gmail.com" title="Gmail">
+                <img src="https://ssl.gstatic.com/ui/v1/icons/mail/rfr/gmail.ico" alt="Gmail" width="20" height="20" />
               </a>
             </div>
 
+            <div class="welcome-search">
+              <div class="welcome-search-icon"></div>
+              <input
+                type="text"
+                id="welcome-search-input"
+                class="welcome-search-input"
+                placeholder="Search or enter URL"
+                spellcheck="false"
+                autocomplete="off"
+              />
+              <div class="welcome-search-kbd"><kbd>&#8984;L</kbd></div>
+            </div>
+
             <div class="welcome-hint">
-              <kbd>&#8984;L</kbd> to focus URL bar &nbsp;&middot;&nbsp; <kbd>&#8984;T</kbd> new tab
+              <kbd>&#8984;T</kbd> new tab
             </div>
           </div>
         </div>
@@ -208,6 +258,20 @@
       </div>
     </main>
     </div><!-- /.app-body -->
+
+    <!-- Tab context menu -->
+    <div class="context-menu" id="tab-context-menu">
+      <button class="context-menu-item" data-action="pin">
+        <span class="context-menu-label" id="ctx-pin-label">Pin tab</span>
+      </button>
+      <button class="context-menu-item" data-action="save">
+        <span class="context-menu-label">Save to bookmarks</span>
+      </button>
+      <div class="context-menu-separator"></div>
+      <button class="context-menu-item context-menu-danger" data-action="close">
+        <span class="context-menu-label">Close tab</span>
+      </button>
+    </div>
   </div>
 
   <script src="dist/renderer.js"></script>

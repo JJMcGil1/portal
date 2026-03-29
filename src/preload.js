@@ -14,6 +14,13 @@ contextBridge.exposeInMainWorld('portal', {
   createSaved: (site) => ipcRenderer.invoke('db-create-saved', site),
   deleteSaved: (id) => ipcRenderer.invoke('db-delete-saved', id),
 
+  // User profile
+  getProfile: () => ipcRenderer.invoke('db-get-profile'),
+  updateProfile: (fields) => ipcRenderer.invoke('db-update-profile', fields),
+
+  // Pinned tab reorder
+  reorderPinnedTabs: (orderedIds) => ipcRenderer.invoke('db-reorder-pinned-tabs', orderedIds),
+
   // Legacy
   loadData: () => ipcRenderer.invoke('load-data'),
   saveData: (data) => ipcRenderer.invoke('save-data', data),

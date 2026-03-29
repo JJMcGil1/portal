@@ -134,15 +134,34 @@ function createWindow() {
 
 app.whenReady().then(() => {
   nativeTheme.themeSource = 'dark';
-  // Set a permissive session for webviews
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': [''],
-      },
-    });
+
+  // Configure the persist:portal partition used by all webviews
+  const webviewSession = session.fromPartition('persist:portal');
+
+  // Strip restrictive CSP headers so sites load properly inside webviews
+  webviewSession.webRequest.onHeadersReceived((details, callback) => {
+    const headers = { ...details.responseHeaders };
+    // Remove CSP and X-Frame-Options that block embedding
+    delete headers['content-security-policy'];
+    delete headers['Content-Security-Policy'];
+    delete headers['x-frame-options'];
+    delete headers['X-Frame-Options'];
+    callback({ responseHeaders: headers });
   });
+
+  // Allow all permission requests (notifications, geolocation, camera, etc.)
+  webviewSession.setPermissionRequestHandler((webContents, permission, callback) => {
+    callback(true);
+  });
+
+  // Enable third-party cookies for OAuth flows (Google, GitHub, etc.)
+  webviewSession.cookies.flushStore().catch(() => {});
+
+  // Set a standard browser user-agent so sites don't block us
+  const chromeVersion = process.versions.chrome;
+  webviewSession.setUserAgent(
+    `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`
+  );
 
   createWindow();
 
@@ -156,6 +175,8 @@ app.on('window-all-closed', () => {
 });
 
 app.on('will-quit', () => {
+  // Flush cookies to disk before quitting so logins persist
+  session.fromPartition('persist:portal').cookies.flushStore().catch(() => {});
   database.close();
 });
 
@@ -169,7 +190,9 @@ ipcMain.handle('db-get-next-tab-id', () => database.getNextTabId());
 ipcMain.handle('db-get-all-saved', () => database.getAllSaved());
 ipcMain.handle('db-create-saved', (_, site) => database.createSaved(site));
 ipcMain.handle('db-delete-saved', (_, id) => database.deleteSaved(id));
-
+ipcMain.handle('db-get-profile', () => database.getProfile());
+ipcMain.handle('db-update-profile', (_, fields) => database.updateProfile(fields));
+ipcMain.handle('db-reorder-pinned-tabs', (_, orderedIds) => database.reorderPinnedTabs(orderedIds));
 // Legacy — keep for backward compat during transition
 ipcMain.handle('load-data', () => ({ sites: database.getAllSaved() }));
 ipcMain.handle('save-data', () => {});

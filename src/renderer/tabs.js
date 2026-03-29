@@ -1,10 +1,16 @@
 // Tab management — CRUD, rendering, loading bar
 
 import { PiX } from 'react-icons/pi';
+import { MdOutlineTab } from 'react-icons/md';
 import { state, nextTabId } from './state.js';
 import { getDomain, getInitial, escapeHtml, escapeAttr } from './utils.js';
-import { urlInput, webviewContainer, welcome, tabsList } from './dom.js';
+import { urlInput, webviewContainer, welcome, tabsList, pinnedList, sidebarPinnedTabs, tabContextMenu } from './dom.js';
+// Note: saveCurrent is imported lazily to avoid circular deps with saved.js
+
 import { renderIcon } from './icon.js';
+
+// Pre-render the default tab icon SVG once
+const defaultTabIconSvg = renderIcon(MdOutlineTab, 14);
 
 // --- Persist helpers ---
 
@@ -37,6 +43,7 @@ export function createNewTab() {
     title: 'New Tab',
     favicon: null,
     loading: false,
+    pinned: false,
   };
   state.tabs.push(tab);
   activateTab(id);
@@ -56,6 +63,7 @@ export function createTab(url) {
     title: getDomain(url),
     favicon: null,
     loading: true,
+    pinned: false,
   };
   state.tabs.push(tab);
 
@@ -74,6 +82,7 @@ export function restoreTab(dbRow) {
     title: dbRow.title || getDomain(dbRow.url) || 'New Tab',
     favicon: dbRow.favicon || null,
     loading: false,
+    pinned: !!dbRow.is_pinned,
   };
   state.tabs.push(tab);
 
@@ -101,6 +110,12 @@ export function navigateTab(id, url) {
   } else {
     attachWebview(tab);
   }
+
+  // Hide welcome screen and show the webview
+  welcome.classList.add('hidden');
+  webviewContainer.querySelectorAll('webview').forEach((wv) => {
+    wv.classList.toggle('active', parseInt(wv.getAttribute('data-tab-id')) === id);
+  });
 
   persistUpdateTab(id, { url: tab.url, title: tab.title, favicon: null });
   renderTabs();
@@ -211,19 +226,185 @@ export function getActiveWebview() {
   );
 }
 
+export function pinTab(id) {
+  const tab = state.tabs.find((t) => t.id === id);
+  if (!tab) return;
+  tab.pinned = true;
+  persistUpdateTab(id, { isPinned: true });
+  renderTabs();
+}
+
+export function unpinTab(id) {
+  const tab = state.tabs.find((t) => t.id === id);
+  if (!tab) return;
+  tab.pinned = false;
+  persistUpdateTab(id, { isPinned: false });
+  renderTabs();
+}
+
+function buildFaviconHtml(tab) {
+  const fallback = tab.url
+    ? `<div class="tab-favicon-placeholder"><span>${escapeHtml(getInitial(tab.url))}</span></div>`
+    : `<div class="tab-favicon-placeholder tab-favicon-icon">${defaultTabIconSvg}</div>`;
+  return tab.favicon
+    ? `<img class="tab-favicon" src="${escapeAttr(tab.favicon)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+      + (tab.url ? `<div class="tab-favicon-placeholder" style="display:none"><span>${escapeHtml(getInitial(tab.url))}</span></div>` : `<div class="tab-favicon-placeholder tab-favicon-icon" style="display:none">${defaultTabIconSvg}</div>`)
+    : fallback;
+}
+
+// --- Drag-and-drop for pinned tabs ---
+
+let dragState = null;
+
+function setupPinnedDrag(el, tab) {
+  el.setAttribute('draggable', 'true');
+
+  el.addEventListener('dragstart', (e) => {
+    dragState = { tabId: tab.id };
+    el.classList.add('pinned-dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    // Minimal ghost
+    e.dataTransfer.setDragImage(el, el.offsetWidth / 2, el.offsetHeight / 2);
+  });
+
+  el.addEventListener('dragend', () => {
+    el.classList.remove('pinned-dragging');
+    pinnedList.querySelectorAll('.pinned-item').forEach(item => item.classList.remove('pinned-drag-over'));
+    dragState = null;
+  });
+
+  el.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    if (!dragState || dragState.tabId === tab.id) return;
+    e.dataTransfer.dropEffect = 'move';
+    el.classList.add('pinned-drag-over');
+  });
+
+  el.addEventListener('dragleave', () => {
+    el.classList.remove('pinned-drag-over');
+  });
+
+  el.addEventListener('drop', (e) => {
+    e.preventDefault();
+    el.classList.remove('pinned-drag-over');
+    if (!dragState || dragState.tabId === tab.id) return;
+
+    const pinnedTabs = state.tabs.filter(t => t.pinned);
+    const fromIdx = pinnedTabs.findIndex(t => t.id === dragState.tabId);
+    const toIdx = pinnedTabs.findIndex(t => t.id === tab.id);
+
+    if (fromIdx !== -1 && toIdx !== -1) {
+      const [moved] = pinnedTabs.splice(fromIdx, 1);
+      pinnedTabs.splice(toIdx, 0, moved);
+      const unpinnedTabs = state.tabs.filter(t => !t.pinned);
+      state.tabs = [...pinnedTabs, ...unpinnedTabs];
+      window.portal.reorderPinnedTabs(pinnedTabs.map(t => t.id));
+      renderTabs();
+    }
+  });
+}
+
+let contextTabId = null;
+
+function showContextMenu(e, tab) {
+  e.preventDefault();
+  contextTabId = tab.id;
+
+  // Update pin label
+  const pinLabel = document.getElementById('ctx-pin-label');
+  pinLabel.textContent = tab.pinned ? 'Unpin tab' : 'Pin tab';
+
+  // Position
+  const menu = tabContextMenu;
+  menu.style.left = `${e.clientX}px`;
+  menu.style.top = `${e.clientY}px`;
+  menu.classList.add('open');
+
+  // Adjust if overflowing
+  requestAnimationFrame(() => {
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) {
+      menu.style.left = `${window.innerWidth - rect.width - 8}px`;
+    }
+    if (rect.bottom > window.innerHeight) {
+      menu.style.top = `${window.innerHeight - rect.height - 8}px`;
+    }
+  });
+}
+
+function hideContextMenu() {
+  tabContextMenu.classList.remove('open');
+  contextTabId = null;
+}
+
+export function setupTabContextMenu() {
+  // Handle menu item clicks
+  tabContextMenu.addEventListener('click', (e) => {
+    const item = e.target.closest('.context-menu-item');
+    if (!item || contextTabId === null) return;
+
+    const action = item.dataset.action;
+    const tab = state.tabs.find((t) => t.id === contextTabId);
+
+    if (action === 'pin' && tab) {
+      if (tab.pinned) unpinTab(tab.id);
+      else pinTab(tab.id);
+    } else if (action === 'save') {
+      import('./saved.js').then(({ saveCurrent }) => saveCurrent());
+    } else if (action === 'close') {
+      closeTab(contextTabId);
+    }
+
+    hideContextMenu();
+  });
+
+  // Close on click outside
+  document.addEventListener('click', (e) => {
+    if (!tabContextMenu.contains(e.target)) {
+      hideContextMenu();
+    }
+  });
+
+  // Close on Escape
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') hideContextMenu();
+  });
+}
+
 export function renderTabs() {
+  const pinnedTabs = state.tabs.filter((t) => t.pinned);
+  const unpinnedTabs = state.tabs.filter((t) => !t.pinned);
+
+  // Toggle pinned section visibility
+  sidebarPinnedTabs.style.display = pinnedTabs.length > 0 ? '' : 'none';
+
+  // Render pinned tabs
+  pinnedList.innerHTML = '';
+  pinnedTabs.forEach((tab) => {
+    const el = document.createElement('div');
+    el.className = `pinned-item${tab.id === state.activeTabId ? ' active' : ''}`;
+    el.dataset.tabId = tab.id;
+    el.innerHTML = `
+      ${buildFaviconHtml(tab)}
+      <span class="pinned-title">${escapeHtml(tab.title)}</span>
+    `;
+
+    el.addEventListener('click', () => activateTab(tab.id));
+    el.addEventListener('contextmenu', (e) => showContextMenu(e, tab));
+    setupPinnedDrag(el, tab);
+
+    pinnedList.appendChild(el);
+  });
+
+  // Render unpinned tabs
   tabsList.innerHTML = '';
-  state.tabs.forEach((tab) => {
+
+  unpinnedTabs.forEach((tab) => {
     const el = document.createElement('div');
     el.className = `tab-item${tab.id === state.activeTabId ? ' active' : ''}`;
 
-    const faviconHtml = tab.favicon
-      ? `<img class="tab-favicon" src="${escapeAttr(tab.favicon)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
-        + `<div class="tab-favicon-placeholder" style="display:none"><span>${escapeHtml(getInitial(tab.url))}</span></div>`
-      : `<div class="tab-favicon-placeholder"><span>${escapeHtml(getInitial(tab.url))}</span></div>`;
-
     el.innerHTML = `
-      ${faviconHtml}
+      ${buildFaviconHtml(tab)}
       <span class="tab-title">${escapeHtml(tab.title)}</span>
       <button class="tab-close" data-id="${tab.id}">
         ${renderIcon(PiX, 10)}
@@ -238,6 +419,7 @@ export function renderTabs() {
       }
     });
 
+    el.addEventListener('contextmenu', (e) => showContextMenu(e, tab));
     tabsList.appendChild(el);
   });
 }

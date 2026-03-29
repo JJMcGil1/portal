@@ -8,9 +8,9 @@ import { createTab } from './tabs.js';
 import { renderIcon } from './icon.js';
 
 export function renderSaved() {
-  const pinnedSection = savedList.closest('.sidebar-pinned');
-  if (pinnedSection) {
-    pinnedSection.style.display = state.saved.length > 0 ? '' : 'none';
+  const savedSection = savedList.closest('.sidebar-saved');
+  if (savedSection) {
+    savedSection.style.display = state.saved.length > 0 ? '' : 'none';
   }
 
   savedList.innerHTML = '';

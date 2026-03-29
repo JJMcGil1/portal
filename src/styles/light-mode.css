@@ -71,10 +71,6 @@ body.light-mode .welcome-title {
   color: #0f0f0f;
 }
 
-body.light-mode .welcome-subtitle {
-  color: var(--text-tertiary);
-}
-
 body.light-mode ::-webkit-scrollbar-thumb {
   background: rgba(0, 0, 0, 0.15);
 }
